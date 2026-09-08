@@ -58,7 +58,7 @@ test('preview runtime publishes hermetic content-addressed final candidates', ()
   }
 })
 
-test('preview runtime enforces publication capacity and canonical base URLs', () => {
+test('preview runtime enforces publication capacity', () => {
   const runtime = new WebDesignAgentPreviewRuntime(1)
   const first = runtime.publish(generation().candidates, PUBLIC_BASE_URL)
 
@@ -67,12 +67,21 @@ test('preview runtime enforces publication capacity and canonical base URLs', ()
       () => runtime.publish(generation().candidates, PUBLIC_BASE_URL),
       /capacity is exhausted/i,
     )
+  } finally {
+    first.close()
+    runtime.close()
+  }
+})
+
+test('preview runtime rejects non-http public base URLs', () => {
+  const runtime = new WebDesignAgentPreviewRuntime()
+
+  try {
     assert.throws(
       () => runtime.publish(generation().candidates, 'file:///tmp/preview'),
       /must use HTTP\(S\)/i,
     )
   } finally {
-    first.close()
     runtime.close()
   }
 })
