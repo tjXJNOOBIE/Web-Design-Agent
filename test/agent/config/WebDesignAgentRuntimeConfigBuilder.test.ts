@@ -51,6 +51,23 @@ test('configures official Playwright MCP as an opt-in browser capability', () =>
   assert.equal(servers['browser']?.continueOnError, false)
 })
 
+test('uses an installed browser executable when the deployment provides one', () => {
+  const servers = serversFor(
+    new WebDesignAgentRuntimeConfigBuilder({
+      WEB_DESIGN_AGENT_ENABLE_PLAYWRIGHT: 'true',
+      WEB_DESIGN_AGENT_PLAYWRIGHT_EXECUTABLE_PATH: '/opt/chromium/chrome',
+    }),
+  )
+
+  assert.deepEqual(servers['browser']?.args, [
+    '-y',
+    '@playwright/mcp@0.0.80',
+    '--executable-path=/opt/chromium/chrome',
+    '--headless',
+    '--isolated',
+  ])
+})
+
 test('prefers a deployment-provided browser MCP URL over local Playwright', () => {
   const servers = serversFor(
     new WebDesignAgentRuntimeConfigBuilder({
