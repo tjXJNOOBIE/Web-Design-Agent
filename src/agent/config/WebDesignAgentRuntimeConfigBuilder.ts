@@ -118,6 +118,7 @@ export class WebDesignAgentRuntimeConfigBuilder {
     return this.buildRuntime(
       'web-design-agent-critic',
       'Web Design Agent Visual Critic',
+      WEB_DESIGN_AGENT_CRITIC_SYSTEM_PROMPT,
       [],
       {components: false, browser: false, conceptImages: false},
     )
