@@ -1,18 +1,18 @@
 # Web Design Agent Progression
 
 > **Status:** Implementation tracker  
-> **Audited implementation head:** `59bf3242ae9aa246a0a5baf2e50f4e317f97718f`  
+> **Audited implementation head:** `dc7d8bc4af2a028a0cebda522474a6e25277531d`  
 > **Authority:** Reports implementation and validation evidence only; product behavior remains owned by `WEB_DESIGN_AGENT_FINAL_DRAFT.md`
 
 ## Summary
 
-Web Design Agent is now physically revalidated after the shared package/repository rename to `strands-bridge` / `@tjxjnoobie/strands-bridge`.
+Web Design Agent is physically validated across the renamed Strands dependency graph, public NoAuth MCP transport, production MCP App, clean packed-consumer installation, native Strands candidate initialization, and a real Playwright MCP browser path.
 
-Strands Agents is the actual agent framework. The bridge remains thin shared lifecycle/composition/package glue and does not own the model/tool loop, provider framework, authentication framework, product prompts, or Web Design Agent policy.
+Strands Agents is the actual agent framework. `@tjxjnoobie/strands-bridge` remains thin shared lifecycle/composition/package glue and does not own the model/tool loop, provider framework, authentication framework, product prompts, or Web Design Agent policy.
 
 The public HTTP MCP product boundary is explicitly **NoAuth**. Clients do not log in or provide Web Design Agent credentials. Deployment-owned model/provider keys are internal service capabilities. Rate limits, concurrency ceilings, request-size limits, timeouts, and compute/resource ceilings are abuse controls, not authentication.
 
-Basic package/runtime uncertainty is no longer a blocker. The remaining gates concern the actual provider-backed design loop, supported-client rendering, one-shot quality measurement, and committing the generated dependency locks from the normal DEVELOPMENT write surface.
+Basic package, Strands, MCP, MCP App, and browser-process uncertainty is no longer a blocker. The remaining gates concern the actual provider-backed design loop, supported-client rendering, one-shot quality measurement, and committing generated dependency locks from the durable DEVELOPMENT write surface.
 
 ## Implemented and Validated
 
@@ -26,7 +26,10 @@ Basic package/runtime uncertainty is no longer a blocker. The remaining gates co
 | One regeneration attempt for low design distance | Implemented + contract tested | `WebDesignAgentRuntime.generate()` |
 | Requested multi-page enforcement | Implemented + contract tested | `validatePages()` |
 | Existing-site/reference browser gating | Implemented + contract tested | runtime validation |
+| Native Strands MCP configuration | Implemented + contract tested | external MCPs now use native `McpServerConfig` fields rather than loose product casts |
+| External tool role ownership | Implemented + contract tested | Candidates own browser/components; Concept Artist owns image provider; Director/Critic do not duplicate those MCP clients |
 | 21st MCP configuration | Implemented configuration | real provider-backed 21st call still pending |
+| Playwright MCP fallback | Implemented + physically validated | official `@playwright/mcp@0.0.80`, canonical browser tool names, environment-owned executable/cache support |
 | Higgsfield concept capability | Implemented configuration | connector-level real image generation completed; WDA southbound provider path still pending |
 | HTTP NoAuth stateless `/mcp` server | Physically validated after rename | real MCP SDK client connected, listed all eight tools, and read the production App resource |
 | Stdio MCP server | Implemented | packaged binary present; dedicated stdio client smoke remains optional |
@@ -41,38 +44,51 @@ Basic package/runtime uncertainty is no longer a blocker. The remaining gates co
 | Standalone HTML/page export | Implemented + contract tested | `DesignExportBuilder` |
 | One-shot vague prompt corpus | Implemented | `ONE_SHOT_DESIGN_PROMPT_CORPUS` |
 | Objective one-shot evaluation metrics | Implemented + contract tested | `OneShotDesignEvaluationHandler` |
-| Package install/build | Physically validated after rename | fresh Node 22.23.2 install, typecheck, 17/17 tests, Vite build, real MCP integration, and package dry-run |
-| Clean consumer package install | Previously physically validated | must be rerun after namespace rename before promotion |
+| Package install/build | Physically validated after rename | fresh Node 22.23.2 install, typecheck, 25/25 tests, Vite build, real MCP integration, and package dry-run |
+| Clean consumer package install | Physically validated after rename | empty npm project installed packed WDA + renamed bridge + Strands 1.16.0, imported exports, started NoAuth MCP, listed eight tools |
+| Physical browser integration | Physically validated | native Strands candidate initialization + Playwright MCP + real navigation/snapshot/PNG + clean teardown |
+| Durable validation command | Implemented | `npm run check:durable` combines core physical gate, browser integration, and package dry-run |
 
 ## Physical Validation Evidence
 
 ### Exact post-rename Web Design Agent graph
 
-Against Web Design Agent head `59bf3242ae9aa246a0a5baf2e50f4e317f97718f` with Node `v22.23.2` and bridge pin `69d27b147ee4f8bf0bfba43cbd0668a1ca4dd868`:
+Node `v22.23.2`, bridge pin `69d27b147ee4f8bf0bfba43cbd0668a1ca4dd868`:
 
 ```text
-fresh Git clone                              PASS
-renamed bridge resolution                    PASS
-@tjxjnoobie/strands-bridge@0.1.0             PASS
-@strands-agents/sdk@1.16.0                   PASS
-npm install                                  PASS
-npm run check:real                           PASS
-contract/delegate tests                      PASS (17 / 17)
-real HTTP MCP integration                    PASS (1 / 1)
-production Vite MCP App build                PASS
-production App size                          438.66 kB / 105.89 kB gzip
-npm pack --dry-run                           PASS
-package files                                144
-package dry-run size                         140,977 bytes
+fresh Git clone                               PASS
+renamed bridge resolution                     PASS
+@tjxjnoobie/strands-bridge@0.1.0              PASS
+@strands-agents/sdk@1.16.0                    PASS
+npm install                                   PASS
+npm run typecheck                             PASS
+contract/delegate tests                       PASS (25 / 25)
+real HTTP MCP integration                     PASS (1 / 1)
+production Vite MCP App build                 PASS
+production App size                           438.66 kB / 105.89 kB gzip
+npm pack --dry-run                            PASS
 ```
 
-The exact install generated npm lockfile v3 at 175,011 bytes.
+The exact install generated npm lockfile v3 at approximately 175 kB. The lock is generated from the renamed bridge graph rather than copied from the pre-rename dependency tree.
 
-The physical MCP integration uses the real MCP SDK `Client` and `StreamableHTTPClientTransport` against the real `WebDesignMcpHttpServer`, requires all eight public tools, reads the bundled `ui://web-design-agent/abc-review.html` resource, and calls `web-design-capabilities`.
+The physical HTTP MCP integration uses the real MCP SDK `Client` and `StreamableHTTPClientTransport` against `WebDesignMcpHttpServer`, requires all eight public tools, reads the bundled `ui://web-design-agent/abc-review.html` resource, and calls `web-design-capabilities`.
+
+### Clean packed consumer smoke
+
+A separate empty npm project installed the current packed artifact and verified:
+
+```text
+@tjxjnoobie/web-design-agent@0.2.0          PASS
+@tjxjnoobie/strands-bridge@0.1.0           PASS
+@strands-agents/sdk@1.16.0                 PASS
+public WDA package import                   PASS
+NoAuth HTTP root startup                    PASS
+root authentication:none                   PASS
+real MCP client negotiation                 PASS
+all eight WDA tools                         PASS
+```
 
 ### Strands bridge
-
-The repository is `tjXJNOOBIE/strands-bridge` and the package is `@tjxjnoobie/strands-bridge`.
 
 The renamed bridge has separately passed:
 
@@ -85,7 +101,29 @@ real Strands SDK verification                PASS (@strands-agents/sdk 1.16.0)
 native disposable Strands + MCP integration  PASS (1 / 1)
 ```
 
-The exact GitHub bridge head consumed by Web Design Agent is `69d27b147ee4f8bf0bfba43cbd0668a1ca4dd868`.
+### Physical WDA browser path
+
+WDA first exposed a real integration defect that contract stubs could not catch: the product used the stale field `toolNamePrefix`, while Strands 1.16 uses `prefix`. The product now builds native Strands MCP server objects directly, so TypeScript protects that boundary.
+
+Playwright MCP itself already exposes canonical names such as `browser_navigate`; WDA therefore does not add another browser prefix.
+
+The checked-in browser integration uses the same WDA-built candidate browser configuration and validates:
+
+```text
+native Strands candidate initialization      PASS
+Playwright MCP stdio connection               PASS
+Playwright tool catalog                       PASS (24 tools)
+browser_navigate                              PASS
+browser_snapshot                              PASS
+browser_take_screenshot                       PASS
+real accessibility snapshot                   PASS
+real PNG image result                         PASS
+clean Strands/runtime teardown                PASS
+```
+
+A durable environment may provide an existing browser executable through `WEB_DESIGN_AGENT_PLAYWRIGHT_EXECUTABLE_PATH` or a browser cache through `WEB_DESIGN_AGENT_PLAYWRIGHT_BROWSERS_PATH` / `PLAYWRIGHT_BROWSERS_PATH`. WDA passes browser-cache state explicitly to the stdio MCP child because the MCP transport intentionally inherits only a safe environment-variable subset.
+
+This proves the physical browser capability and Strands candidate lifecycle. It does **not** yet prove that a real model successfully uses that capability to critique and repair a generated candidate.
 
 ### Official MCP Apps browser host smoke
 
@@ -106,29 +144,46 @@ This validates the MCP App protocol and browser behavior under the official host
 
 ### Higgsfield capability smoke
 
-The connected Higgsfield surface successfully completed one real 16:9 website-concept image generation. This proves the external image-generation capability is live. It does not yet prove Web Design Agent's southbound concept-provider path through Strands. Provider authorization is deployment-owned and does not alter the NoAuth WDA client contract.
+The connected Higgsfield surface successfully completed one real 16:9 website-concept image generation. This proves the external image-generation capability is live. It does not yet prove Web Design Agent's southbound Concept Artist provider path through Strands. Provider authorization is deployment-owned and does not alter the NoAuth WDA client contract.
 
-### Model/provider availability in the validation sandbox
+### Model/provider availability in the external validation sandbox
 
-The capable external validation sandbox used for post-rename package validation has no configured AWS, Anthropic, OpenAI, Google/Gemini, or 21st credentials. Therefore no provider-backed generation is claimed from that environment.
+The external validation sandbox used for package/browser validation has no configured AWS, Anthropic, OpenAI, Google/Gemini, or 21st credentials. Therefore no provider-backed generation is claimed from that environment.
+
+## Durable DEVELOPMENT Gate
+
+The repository now exposes one typed physical validation command for a durable reusable DEVELOPMENT environment:
+
+```text
+npm run check:durable
+```
+
+This runs:
+
+1. strict TypeScript;
+2. delegate/product tests;
+3. real WDA HTTP MCP integration and production App build;
+4. physical native Strands + Playwright MCP browser integration;
+5. npm package dry-run.
+
+The browser gate requires an environment-owned executable or equivalent valid Playwright deployment configuration. Browser installation is an environment/bootstrap responsibility, not per-request work.
 
 ## Dependency Lock State
 
-The exact post-rename WDA install generated npm lockfile v3 at 175,011 bytes with the renamed bridge package/head. The renamed bridge also generates its own real lockfile in Node 22 validation.
+The exact post-rename WDA install generates npm lockfile v3 from the renamed bridge graph. The renamed bridge also generates its own real lockfile in Node 22 validation.
 
-Those generated lockfiles have not been hand-reassembled through chat output. They should be committed from the normal Tavall DEVELOPMENT environment/write surface so the repository receives the exact generated bytes rather than a reconstructed dependency graph.
+Those generated lockfiles should be committed from the durable Tavall DEVELOPMENT write surface so the repository receives the exact generated bytes rather than a reconstructed dependency graph.
 
 ## Remaining Promotion Gates
 
 1. Commit the exact generated WDA `package-lock.json`; commit the bridge lockfile if repository policy retains it.
-2. Rerun the clean external consumer/tarball smoke against the renamed bridge package identity.
-3. Run an authorized real model generation through the Web Design Agent Director and candidate specialists.
-4. Run real 21st MCP discovery/use through Strands using the deployment-owned API key.
-5. Run the Web Design Agent's configured southbound browser MCP through an actual candidate render/critique/repair cycle.
-6. Run Web Design Agent's configured southbound concept-provider path through Strands with deployment-owned provider authorization. Connector-level generation is already proven separately.
-7. Render the production MCP App in supported ChatGPT and Claude clients.
-8. Run the full vague-prompt corpus with the real model/browser loop and record one-shot quality measurements.
+2. Run an authorized real model generation through the Web Design Agent Director and candidate specialists.
+3. Run real 21st MCP discovery/use through Strands using the deployment-owned API key.
+4. Use the physically proven browser capability in an actual model-led candidate render -> inspect -> critique -> repair loop.
+5. Run Web Design Agent's configured southbound concept-provider path through Strands with deployment-owned provider authorization. Connector-level generation is already proven separately.
+6. Render the production MCP App in supported ChatGPT and Claude clients.
+7. Run the full vague-prompt corpus with the real model/browser loop and record one-shot quality measurements.
 
 ## Promotion State
 
-PR #2 remains Draft. The public product boundary is intentionally NoAuth; provider credentials are deployment concerns rather than client authentication requirements. The principal remaining work is real model/tool design-quality evidence and supported-client validation, not package or MCP plumbing.
+PR #2 remains Draft. The public product boundary is intentionally NoAuth; provider credentials are deployment concerns rather than client authentication requirements. The principal remaining work is real model/tool design-quality evidence and supported-client validation, not package, Strands, MCP, or browser-process plumbing.
