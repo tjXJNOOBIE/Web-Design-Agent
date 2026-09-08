@@ -1,4 +1,4 @@
-import type {IStrandsAgentRuntime} from '@tjxjnoobie/custom-strands-bridge'
+import type {IStrandsAgentRuntime} from '@tjxjnoobie/strands-bridge'
 import type {WebDesignAgentCapabilityData} from '../config/WebDesignAgentRuntimeConfigBuilder.js'
 import type {IWebDesignAgentRuntime} from './IWebDesignAgentRuntime.js'
 import type {DesignCandidateData} from '../../design/data/DesignCandidateData.js'
