@@ -1,37 +1,4 @@
-import type { IStrandsAgentRuntimeBootstrap } from '@tjxjnoobie/custom-strands-bridge'
-
-import type { WebDesignAgentRuntimeConfigBuilder } from '../agent/config/WebDesignAgentRuntimeConfigBuilder.js'
-import { WebDesignAgentCliInputError } from './error/WebDesignAgentCliInputError.js'
-
-export class WebDesignAgentCliHandler {
-  private readonly agentRuntimeBootstrap: IStrandsAgentRuntimeBootstrap
-  private readonly runtimeConfigBuilder: WebDesignAgentRuntimeConfigBuilder
-
-  public constructor(
-    agentRuntimeBootstrap: IStrandsAgentRuntimeBootstrap,
-    runtimeConfigBuilder: WebDesignAgentRuntimeConfigBuilder,
-  ) {
-    this.agentRuntimeBootstrap = agentRuntimeBootstrap
-    this.runtimeConfigBuilder = runtimeConfigBuilder
-  }
-
-  public async handle(request: string): Promise<string> {
-    const normalizedRequest = request.trim()
-
-    if (normalizedRequest.length === 0) {
-      throw new WebDesignAgentCliInputError()
-    }
-
-    const agentRuntime = await this.agentRuntimeBootstrap.createAgentRuntime(
-      this.runtimeConfigBuilder.build(),
-    )
-
-    try {
-      const result = await agentRuntime.invokeAgent(normalizedRequest)
-
-      return result.toString()
-    } finally {
-      await agentRuntime.close()
-    }
-  }
-}
+import type {DesignGenerationRequest} from '../design/data/DesignGenerationRequest.js'
+import type {IWebDesignAgentWorkflowHandler} from '../design/handler/IWebDesignAgentWorkflowHandler.js'
+import {WebDesignAgentCliInputError} from './error/WebDesignAgentCliInputError.js'
+export class WebDesignAgentCliHandler{public constructor(private readonly workflow:IWebDesignAgentWorkflowHandler){}public async handle(request:DesignGenerationRequest):Promise<string>{const prompt=request.prompt.trim();if(!prompt)throw new WebDesignAgentCliInputError();return JSON.stringify(await this.workflow.generate({...request,prompt}),null,2)}}

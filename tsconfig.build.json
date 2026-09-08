@@ -1,15 +1,1 @@
-{
-  "extends": "./tsconfig.json",
-  "compilerOptions": {
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "declaration": true,
-    "noEmit": false
-  },
-  "include": [
-    "src/**/*.ts"
-  ],
-  "exclude": [
-    "test/**/*.ts"
-  ]
-}
+{"extends":"./tsconfig.json","compilerOptions":{"outDir":"./dist","rootDir":"./src","declaration":true,"noEmit":false},"include":["src/**/*.ts"],"exclude":["src/mcp-app/**/*.ts","test/**/*.ts"]}
