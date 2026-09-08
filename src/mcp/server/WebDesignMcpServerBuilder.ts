@@ -57,8 +57,11 @@ export class WebDesignMcpServerBuilder {
         },
         ...ui,
       },
-      async (input: any) =>
-        this.payload('generation', await this.workflow.generate(input)),
+      async (input: any, extra: any) =>
+        this.payload(
+          'generation',
+          await this.workflow.generate(input, extra?.mcpReq?.signal),
+        ),
     )
 
     registerAppTool(
@@ -75,14 +78,17 @@ export class WebDesignMcpServerBuilder {
         },
         ...ui,
       },
-      async (input: any) =>
+      async (input: any, extra: any) =>
         this.payload(
           'candidate',
-          await this.workflow.refine({
-            candidate: input.candidate,
-            visualState: input.visualState,
-            feedback: input.feedback ?? '',
-          }),
+          await this.workflow.refine(
+            {
+              candidate: input.candidate,
+              visualState: input.visualState,
+              feedback: input.feedback ?? '',
+            },
+            extra?.mcpReq?.signal,
+          ),
         ),
     )
 
@@ -95,8 +101,11 @@ export class WebDesignMcpServerBuilder {
         inputSchema: {prompt: promptSchema},
         ...ui,
       },
-      async (input: any) =>
-        this.payload('concepts', await this.workflow.createConcepts(input.prompt)),
+      async (input: any, extra: any) =>
+        this.payload(
+          'concepts',
+          await this.workflow.createConcepts(input.prompt, extra?.mcpReq?.signal),
+        ),
     )
 
     registerAppTool(
@@ -109,14 +118,17 @@ export class WebDesignMcpServerBuilder {
         inputSchema: {prompt: promptSchema, concept: conceptSchema},
         ...ui,
       },
-      async (input: any) =>
+      async (input: any, extra: any) =>
         this.payload(
           'generation',
-          await this.workflow.generate({
-            prompt: input.prompt,
-            sourceMode: 'concept-first',
-            selectedConcept: input.concept,
-          }),
+          await this.workflow.generate(
+            {
+              prompt: input.prompt,
+              sourceMode: 'concept-first',
+              selectedConcept: input.concept,
+            },
+            extra?.mcpReq?.signal,
+          ),
         ),
     )
 
