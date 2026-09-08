@@ -20,7 +20,7 @@ This repository owns:
 - design intent, Design Genome, design system, visual state, multi-page, concept, export, and preference-profile contracts;
 - the stateless public NoAuth MCP product surface and local stdio surface;
 - the MCP App review/editor experience;
-- selection of optional browser, component-research, and concept-image MCP integrations;
+- selection and role-scoping of optional browser, component-research, and concept-image MCP integrations;
 - one-shot evaluation metrics and product validation requirements.
 
 Strands is the agent framework and owns the model/tool loop. The thin `@tjxjnoobie/strands-bridge` package owns only shared integration mechanics that multiple products would otherwise duplicate:
@@ -72,9 +72,52 @@ Requested non-home routes are returned in `pages[]` and use the candidate's shar
 
 Browser evidence is truthful only when browser tooling actually executed. Existing-site and reference-image modes reject without configured browser capability rather than inventing inspection evidence.
 
+The product uses native Strands `McpServerConfig` contracts for external MCP configuration. Product code must not hide external MCP fields behind loose `Record<string, unknown>` casts.
+
 Higgsfield concept-first generation is optional. Generated imagery is labeled and treated as conceptual reference. The selected concept must still be turned into real A/B/C implementations before it represents working product behavior.
 
 Provider keys, OAuth state, or other credentials required by optional model/design services are deployment-owned service capabilities. They are not credentials that a client must supply to use the Web Design Agent MCP endpoint.
+
+### External Tool Ownership Rule
+
+External capabilities are assigned only to the Strands agents that own the work:
+
+```text
+Design Director
+  -> candidate A/B/C agent tools
+  -> visual critic agent tool
+  -> optional concept artist agent tool
+
+Candidate A/B/C
+  -> optional 21st component MCP
+  -> optional browser MCP
+
+Visual Critic
+  -> no independent browser/component MCP process
+
+Concept Artist
+  -> optional concept-image MCP only
+```
+
+The Director coordinates specialists instead of opening duplicate browser/component clients itself. The critic evaluates evidence produced by the candidate flow instead of silently becoming another implementation/runtime surface.
+
+##### Why
+
+Role-scoped tools make ownership explicit, reduce duplicate MCP/browser processes, keep prompts easier to reason about, and make infrastructure cost proportional to actual work rather than agent count.
+
+### Browser Capability Rule
+
+A deployment may provide a remote browser MCP through `WEB_DESIGN_AGENT_BROWSER_MCP_URL`. When a remote browser is not supplied, a deployment may opt into the official Playwright MCP stdio fallback through `WEB_DESIGN_AGENT_ENABLE_PLAYWRIGHT=true`.
+
+The fallback uses the canonical Playwright MCP browser tool names without adding another product prefix. `browser_navigate` must remain `browser_navigate`, not `browser_browser_navigate`.
+
+A hosted/durable environment should provide its browser at environment bootstrap time rather than downloading browser binaries for every design request. WDA supports:
+
+- `WEB_DESIGN_AGENT_PLAYWRIGHT_EXECUTABLE_PATH` for an environment-owned browser executable;
+- `WEB_DESIGN_AGENT_PLAYWRIGHT_BROWSERS_PATH` or `PLAYWRIGHT_BROWSERS_PATH` for an environment-owned Playwright cache;
+- `WEB_DESIGN_AGENT_PLAYWRIGHT_MCP_COMMAND` for an environment-specific Playwright MCP command path.
+
+Browser cache variables are copied explicitly into the stdio MCP child because the MCP transport intentionally inherits only a safe environment-variable subset.
 
 ### NoAuth Public MCP Rule
 
@@ -148,6 +191,7 @@ Every public workflow call builds a fresh composition. The public HTTP MCP endpo
 prompt
 -> Design Director hidden brief
 -> candidate A/B/C specialist invocations
+-> candidate browser/component work when configured
 -> critic/review loop
 -> typed candidate parsing
 -> deterministic design-distance validation
@@ -162,6 +206,7 @@ selected candidate
 + live VisualState snapshot
 + optional human feedback
 -> matching candidate specialist
+-> browser evidence when configured
 -> visual critic
 -> replacement candidate
 ```
@@ -233,37 +278,54 @@ The suite does not fabricate subjective metrics such as "user would choose one" 
 
 ## Validation Requirements
 
-The current PR line now has physical infrastructure evidence in addition to its contract tests.
+The current PR line has physical infrastructure evidence in addition to contract tests.
 
-Verified on Node `v22.23.2` with real installed packages before the package namespace reconciliation:
+Verified on Node `v22.23.2` with real installed packages and the renamed bridge graph:
 
-- clean `npm install` succeeds;
-- strict TypeScript typecheck succeeds;
-- 17/17 delegate/product contract tests pass;
-- production TypeScript and Vite MCP App builds succeed;
-- `npm pack` succeeds;
-- real MCP SDK 1.30 client negotiates the HTTP server, lists all eight tools, reads the production MCP App resource, and calls a real tool;
-- a clean external npm consumer installs the packed artifact, imports the public package, starts the MCP binary, and negotiates all eight tools;
-- the shared bridge physically verifies real `@strands-agents/sdk@1.16.0` and passes a native disposable Strands + MCP integration flow;
-- the production MCP App completes the official MCP Apps `AppBridge` initialization flow in Chromium and passes A/B/C selection, route switching, live slider mutation, compare mode, and `ui/update-model-context` handoff;
-- one real Higgsfield website-concept generation completes through the connected external generation surface.
+```text
+fresh npm install                              PASS
+@tjxjnoobie/strands-bridge@0.1.0               PASS
+@strands-agents/sdk@1.16.0                     PASS
+strict TypeScript                              PASS
+delegate/product tests                         PASS (25 / 25)
+real WDA HTTP MCP integration                  PASS (1 / 1)
+production Vite MCP App build                  PASS
+npm package dry-run                            PASS
+clean external packed-consumer install         PASS
+packed NoAuth MCP startup + eight tools        PASS
+official MCP Apps AppBridge browser smoke      PASS
+native Strands candidate with browser MCP      PASS
+Playwright MCP browser catalog                 PASS (24 tools)
+real browser navigation                        PASS
+real accessibility snapshot                    PASS
+real PNG screenshot                            PASS
+```
 
-The renamed `@tjxjnoobie/strands-bridge` package and WDA dependency/import reconciliation must receive the same clean Node 22 install/check before that namespace change is considered physically revalidated.
+The physical browser gate initializes the candidate through `StrandsAgentRuntimeBootstrap` with the same WDA-built browser configuration used by the product, validates canonical Playwright MCP tool names, performs real browser operations, and verifies clean teardown.
+
+The durable/reusable DEVELOPMENT validation entry point is:
+
+```text
+npm run check:durable
+```
+
+It runs the physical core MCP gate, the Strands + browser integration gate, and package dry-run. A durable environment must provide `WEB_DESIGN_AGENT_PLAYWRIGHT_EXECUTABLE_PATH` or another valid browser deployment configuration for the physical browser portion.
+
+One real Higgsfield website-concept generation has also completed through the connected external generation surface. That is provider-capability evidence, not yet proof of the WDA Concept Artist southbound MCP path.
 
 Before this draft may be promoted, the remaining product-quality paths must be verified:
 
-- commit the generated npm lockfile from the normal DEVELOPMENT environment when available;
-- rerun clean Node 22 install and `check:real` against the renamed bridge package/commit;
+- commit the exact generated npm lockfile from the normal durable DEVELOPMENT environment;
 - run an authorized real model generation through the Design Director and candidate specialists;
 - run real 21st MCP discovery/use through Strands with the deployment-owned API key;
-- run the configured southbound browser MCP through a real candidate render/critique/repair loop;
+- use the now-proven browser capability inside an actual model-led candidate render -> inspect -> critique -> repair loop;
 - run the configured southbound Higgsfield concept-first path through Strands with deployment-owned provider authorization;
 - render the production MCP App in supported ChatGPT and Claude clients;
 - record exact one-shot evaluation results from real model/browser runs.
 
 ##### Why
 
-Infrastructure validation proves the package, Strands boundary, transport, App protocol, browser shell, and packaging behave physically. It does not prove the product's defining quality claim: that a vague prompt produces strong, distinctive sites through the complete provider-backed model and design-tool loop. Promotion therefore remains tied to that evidence rather than to dependency plumbing alone.
+Infrastructure validation proves the package, Strands boundary, transport, App protocol, browser process, and packaging behave physically. It does not prove the product's defining quality claim: that a vague prompt produces strong, distinctive sites through the complete provider-backed model and design-tool loop. Promotion therefore remains tied to that evidence rather than to dependency plumbing alone.
 
 ## Final Rules Summary
 
@@ -272,7 +334,9 @@ Infrastructure validation proves the package, Strands boundary, transport, App p
 - A/B/C means structurally different real implementations.
 - Deterministic code validates candidate diversity and required pages.
 - External component libraries inspire design but do not force framework migration.
+- External MCP capabilities are role-scoped to the Strands agents that own them.
 - Browser evidence is never invented.
+- Hosted/durable environments own browser provisioning; requests do not download browsers.
 - Concept imagery is optional reference material, not implementation proof.
 - Slider changes are immediate local visual input and become model input only on refinement.
 - Public anonymous MCP requests remain isolated and stateless.
