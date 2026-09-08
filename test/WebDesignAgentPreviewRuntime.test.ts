@@ -4,27 +4,31 @@ import test from 'node:test'
 import {WebDesignAgentPreviewRuntime} from '../src/design/preview/WebDesignAgentPreviewRuntime.js'
 import {generation} from './fixture/DesignFixture.js'
 
-test('preview runtime serves hermetic content-addressed final candidates', async () => {
+const PUBLIC_BASE_URL = 'https://design.example/'
+
+test('preview runtime publishes hermetic content-addressed final candidates', () => {
   const runtime = new WebDesignAgentPreviewRuntime()
+  const generated = generation()
+  const first = runtime.publish(generated.candidates, PUBLIC_BASE_URL)
 
   try {
-    const generated = generation()
-    const first = await runtime.publish(generated.candidates)
-    const response = await fetch(first.A.url)
-    const html = await response.text()
+    const aTarget = first.targets.A
+    const aPath = new URL(aTarget.url).pathname
+    const aPreview = runtime.read(aPath)
 
-    assert.equal(response.status, 200)
-    assert.match(first.A.url, /\/candidate\/a\/[a-f0-9]{64}\/$/)
-    assert.match(html, /A/i)
     assert.match(
-      response.headers.get('content-security-policy') ?? '',
+      aTarget.url,
+      /^https:\/\/design\.example\/preview\/[A-Za-z0-9_-]{32}\/a\/[a-f0-9]{64}\/$/,
+    )
+    assert.match(aPreview?.html ?? '', /A/i)
+    assert.match(
+      aPreview?.contentSecurityPolicy ?? '',
       /sandbox allow-scripts/i,
     )
     assert.match(
-      response.headers.get('content-security-policy') ?? '',
+      aPreview?.contentSecurityPolicy ?? '',
       /connect-src 'none'/i,
     )
-    assert.equal(response.headers.get('cache-control'), 'no-store')
 
     const changedCandidates = generated.candidates.map((candidate) =>
       candidate.id === 'A'
@@ -37,28 +41,38 @@ test('preview runtime serves hermetic content-addressed final candidates', async
           }
         : candidate,
     )
-    const second = await runtime.publish(changedCandidates)
+    const second = runtime.publish(changedCandidates, PUBLIC_BASE_URL)
 
-    assert.notEqual(first.A.fingerprint, second.A.fingerprint)
-    assert.notEqual(first.A.url, second.A.url)
-    assert.equal(first.B.fingerprint, second.B.fingerprint)
+    try {
+      assert.notEqual(first.targets.A.fingerprint, second.targets.A.fingerprint)
+      assert.notEqual(first.targets.A.url, second.targets.A.url)
+      assert.equal(first.targets.B.fingerprint, second.targets.B.fingerprint)
+    } finally {
+      second.close()
+    }
   } finally {
-    await runtime.close()
+    const path = new URL(first.targets.A.url).pathname
+    first.close()
+    assert.equal(runtime.read(path), undefined)
+    runtime.close()
   }
 })
 
-test('preview runtime refuses unknown paths and non-GET methods', async () => {
-  const runtime = new WebDesignAgentPreviewRuntime()
+test('preview runtime enforces publication capacity and canonical base URLs', () => {
+  const runtime = new WebDesignAgentPreviewRuntime(1)
+  const first = runtime.publish(generation().candidates, PUBLIC_BASE_URL)
 
   try {
-    const targets = await runtime.publish(generation().candidates)
-    const unknown = await fetch(new URL('/not-a-preview', targets.A.url))
-    const post = await fetch(targets.A.url, {method: 'POST'})
-
-    assert.equal(unknown.status, 404)
-    assert.equal(post.status, 405)
-    assert.equal(post.headers.get('allow'), 'GET')
+    assert.throws(
+      () => runtime.publish(generation().candidates, PUBLIC_BASE_URL),
+      /capacity is exhausted/i,
+    )
+    assert.throws(
+      () => runtime.publish(generation().candidates, 'file:///tmp/preview'),
+      /must use HTTP\(S\)/i,
+    )
   } finally {
-    await runtime.close()
+    first.close()
+    runtime.close()
   }
 })
