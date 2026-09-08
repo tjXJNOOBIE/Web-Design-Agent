@@ -217,27 +217,36 @@ The suite does not fabricate subjective metrics such as "user would choose one" 
 
 ## Validation Requirements
 
-Implementation commit `6490fb8e0ee3aaafa4e321bcf78f98ae813aeab0` has local contract evidence:
+The current PR line now has physical infrastructure evidence in addition to its contract tests.
 
-- strict TypeScript typecheck against local external-boundary stubs;
-- 17/17 delegate/product contract tests;
-- server TypeScript build against the same external-boundary stubs.
+Verified on Node `v22.23.2` with real installed packages:
 
-That evidence proves product orchestration/contracts under substituted external boundaries only. It does not prove physical Strands SDK, MCP SDK, model-provider, browser, 21st, Higgsfield, or hosted-client behavior.
+- clean `npm install` succeeds;
+- strict TypeScript typecheck succeeds;
+- 17/17 delegate/product contract tests pass;
+- production TypeScript and Vite MCP App builds succeed;
+- `npm pack` succeeds;
+- real MCP SDK 1.30 client negotiates the HTTP server, lists all eight tools, reads the production MCP App resource, and calls a real tool;
+- a clean external npm consumer installs the packed artifact, imports the public package, starts the MCP binary, and negotiates all eight tools;
+- the exact shared bridge commit physically verifies real `@strands-agents/sdk@1.16.0` and passes a native disposable Strands + MCP integration flow;
+- the production MCP App completes the official MCP Apps `AppBridge` initialization flow in Chromium and passes A/B/C selection, route switching, live slider mutation, compare mode, and `ui/update-model-context` handoff;
+- one real Higgsfield website-concept generation completes through the connected external generation surface.
 
-Before this draft may be promoted:
+The clean install also generates npm lockfile v3 reproducibly. It must be committed directly from the normal DEVELOPMENT environment rather than hand-reassembled from tool output.
 
-- install real npm dependencies and generate the lockfile;
-- validate the exact shared bridge against its physical Strands SDK dependency;
-- run an authorized real model generation;
-- run real 21st MCP discovery/use;
-- run real browser rendering, responsive checks, and screenshot/interaction evidence;
-- validate Higgsfield concept-first when enabled;
-- build the production Vite single-file MCP App against the real packages;
-- run in-process/remote MCP client tests against the real SDK;
-- run clean-directory package install and CLI/MCP smoke tests;
-- render the MCP App in supported ChatGPT/Claude clients;
+Before this draft may be promoted, the remaining product-quality paths must be verified:
+
+- commit the generated npm lockfile from the DEVELOPMENT environment;
+- run an authorized real model generation through the Design Director and candidate specialists;
+- run authenticated 21st MCP discovery/use through the configured Strands runtime;
+- run the configured southbound browser MCP through a real candidate render/critique/repair loop;
+- run the configured southbound Higgsfield MCP/OAuth concept-first path through Strands;
+- render the production MCP App in supported ChatGPT and Claude clients;
 - record exact one-shot evaluation results from real model/browser runs.
+
+##### Why
+
+Infrastructure validation proves the package, Strands boundary, transport, App protocol, browser shell, and packaging behave physically. It does not prove the product's defining quality claim: that a vague prompt produces strong, distinctive sites through the complete authenticated model and design-tool loop. Promotion therefore remains tied to that evidence rather than to dependency plumbing alone.
 
 ## Final Rules Summary
 
