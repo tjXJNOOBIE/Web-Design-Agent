@@ -19,6 +19,7 @@ interface ToolCallEventLike {
   }
   readonly toolUse?: {
     readonly name?: unknown
+    readonly input?: unknown
   }
   readonly result?: {
     readonly status?: unknown
@@ -29,10 +30,19 @@ interface ToolCallEventLike {
   }
 }
 
+interface CandidateBrowserState {
+  currentTarget?: string
+  readonly inspections: Map<string, Set<string>>
+}
+
 export class WebDesignAgentToolEvidenceCollector {
   private readonly successfulCandidateTools = new Map<
     DesignCandidateId,
     Set<string>
+  >()
+  private readonly browserState = new Map<
+    DesignCandidateId,
+    CandidateBrowserState
   >()
   private readonly successfulConceptTools = new Set<string>()
 
@@ -52,22 +62,38 @@ export class WebDesignAgentToolEvidenceCollector {
   }
 
   public browserEvidence(candidateId: DesignCandidateId): readonly string[] {
-    return this.candidateToolEvidence(candidateId, 'browser_')
+    const state = this.browserState.get(candidateId)
+    if (state === undefined) return []
+
+    const evidence: string[] = []
+    for (const [target, tools] of state.inspections) {
+      const displayedTarget = this.displayTarget(target)
+      for (const toolName of [...tools].sort()) {
+        evidence.push(`${toolName} executed successfully for ${displayedTarget}.`)
+      }
+    }
+
+    return evidence.sort()
   }
 
   public componentEvidence(candidateId: DesignCandidateId): readonly string[] {
     return this.candidateToolEvidence(candidateId, 'components_')
   }
 
-  public hasBrowserInspection(candidateId: DesignCandidateId): boolean {
-    const tools = this.successfulCandidateTools.get(candidateId)
-    if (tools === undefined) return false
+  public hasBrowserInspection(
+    candidateId: DesignCandidateId,
+    expectedTarget?: string,
+  ): boolean {
+    const inspections = this.browserState.get(candidateId)?.inspections
+    if (inspections === undefined || inspections.size === 0) return false
 
-    for (const toolName of tools) {
-      if (BROWSER_INSPECTION_TOOLS.has(toolName)) return true
-    }
+    if (expectedTarget === undefined) return true
 
-    return false
+    const normalizedExpectedTarget = this.normalizeBrowserTarget(expectedTarget)
+    return (
+      normalizedExpectedTarget !== undefined &&
+      (inspections.get(normalizedExpectedTarget)?.size ?? 0) > 0
+    )
   }
 
   public hasComponentResearch(candidateId: DesignCandidateId): boolean {
@@ -76,9 +102,10 @@ export class WebDesignAgentToolEvidenceCollector {
 
   public missingBrowserInspection(
     candidateIds: readonly DesignCandidateId[] = ['A', 'B', 'C'],
+    expectedTarget?: string,
   ): readonly DesignCandidateId[] {
     return candidateIds.filter(
-      (candidateId) => !this.hasBrowserInspection(candidateId),
+      (candidateId) => !this.hasBrowserInspection(candidateId, expectedTarget),
     )
   }
 
@@ -129,24 +156,103 @@ export class WebDesignAgentToolEvidenceCollector {
     const toolName = event.toolUse?.name
 
     if (typeof agentId !== 'string' || typeof toolName !== 'string') return
-    if (event.error !== undefined || event.result?.status === 'error') return
 
     const candidateId = CANDIDATE_AGENT_IDS[agentId]
     if (candidateId !== undefined) {
-      if (
-        toolName.startsWith('browser_') ||
-        toolName.startsWith('components_')
-      ) {
-        const tools = this.successfulCandidateTools.get(candidateId) ?? new Set<string>()
+      this.recordCandidateTool(candidateId, toolName, event)
+      return
+    }
+
+    if (
+      agentId === CONCEPT_AGENT_ID &&
+      toolName.startsWith('assets_') &&
+      this.succeeded(event)
+    ) {
+      this.successfulConceptTools.add(toolName)
+    }
+  }
+
+  private recordCandidateTool(
+    candidateId: DesignCandidateId,
+    toolName: string,
+    event: ToolCallEventLike,
+  ): void {
+    if (toolName === 'browser_navigate') {
+      const state = this.browserStateFor(candidateId)
+      if (!this.succeeded(event)) {
+        delete state.currentTarget
+        return
+      }
+
+      const target = this.browserNavigationTarget(event.toolUse?.input)
+      if (target === undefined) {
+        delete state.currentTarget
+        return
+      }
+
+      state.currentTarget = target
+      return
+    }
+
+    if (toolName.startsWith('browser_')) {
+      if (!this.succeeded(event)) return
+
+      if (BROWSER_INSPECTION_TOOLS.has(toolName)) {
+        const state = this.browserStateFor(candidateId)
+        const target = state.currentTarget
+        if (target === undefined) return
+
+        const tools = state.inspections.get(target) ?? new Set<string>()
         tools.add(toolName)
-        this.successfulCandidateTools.set(candidateId, tools)
+        state.inspections.set(target, tools)
       }
       return
     }
 
-    if (agentId === CONCEPT_AGENT_ID && toolName.startsWith('assets_')) {
-      this.successfulConceptTools.add(toolName)
+    if (toolName.startsWith('components_') && this.succeeded(event)) {
+      const tools = this.successfulCandidateTools.get(candidateId) ?? new Set<string>()
+      tools.add(toolName)
+      this.successfulCandidateTools.set(candidateId, tools)
     }
+  }
+
+  private browserStateFor(candidateId: DesignCandidateId): CandidateBrowserState {
+    const existing = this.browserState.get(candidateId)
+    if (existing !== undefined) return existing
+
+    const created: CandidateBrowserState = {inspections: new Map()}
+    this.browserState.set(candidateId, created)
+    return created
+  }
+
+  private browserNavigationTarget(input: unknown): string | undefined {
+    if (!this.isRecord(input)) return undefined
+    const url = input['url']
+    return typeof url === 'string' ? this.normalizeBrowserTarget(url) : undefined
+  }
+
+  private normalizeBrowserTarget(value: string): string | undefined {
+    try {
+      const url = new URL(value)
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') return undefined
+      url.hash = ''
+      return url.href
+    } catch {
+      return undefined
+    }
+  }
+
+  private displayTarget(value: string): string {
+    try {
+      const url = new URL(value)
+      return `${url.origin}${url.pathname}`
+    } catch {
+      return '[invalid target]'
+    }
+  }
+
+  private succeeded(event: ToolCallEventLike): boolean {
+    return event.error === undefined && event.result?.status !== 'error'
   }
 
   private isRecord(value: unknown): value is Record<string, unknown> {
