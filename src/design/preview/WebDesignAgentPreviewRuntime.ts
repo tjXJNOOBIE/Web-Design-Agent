@@ -1,6 +1,4 @@
-import {createHash} from 'node:crypto'
-import {createServer, type Server, type ServerResponse} from 'node:http'
-import type {AddressInfo} from 'node:net'
+import {createHash, randomBytes} from 'node:crypto'
 
 import type {
   DesignCandidateData,
@@ -12,6 +10,28 @@ export interface DesignCandidatePreviewTargetData {
   readonly candidateId: DesignCandidateId
   readonly fingerprint: string
   readonly url: string
+}
+
+export interface WebDesignAgentPreviewResponseData {
+  readonly html: string
+  readonly contentSecurityPolicy: string
+}
+
+export class WebDesignAgentPreviewPublication {
+  private closed = false
+
+  public constructor(
+    public readonly targets: Readonly<
+      Record<DesignCandidateId, DesignCandidatePreviewTargetData>
+    >,
+    private readonly releasePublication: () => void,
+  ) {}
+
+  public close(): void {
+    if (this.closed) return
+    this.closed = true
+    this.releasePublication()
+  }
 }
 
 const PREVIEW_CONTENT_SECURITY_POLICY = [
@@ -30,134 +50,125 @@ const PREVIEW_CONTENT_SECURITY_POLICY = [
   "form-action 'none'",
 ].join('; ')
 
+interface PreviewDocumentEntry {
+  readonly publicationId: string
+  readonly html: string
+}
+
 export class WebDesignAgentPreviewRuntime {
-  private server?: Server
-  private origin?: string
-  private readonly documents = new Map<string, string>()
+  private readonly documents = new Map<string, PreviewDocumentEntry>()
+  private readonly publicationPaths = new Map<string, readonly string[]>()
 
   public constructor(
+    private readonly maximumActivePublications = 4,
+    private readonly maximumPublicationBytes = 2_000_000,
     private readonly exportBuilder = new DesignExportBuilder(),
-  ) {}
+  ) {
+    this.assertPositiveInteger(
+      maximumActivePublications,
+      'maximumActivePublications',
+    )
+    this.assertPositiveInteger(
+      maximumPublicationBytes,
+      'maximumPublicationBytes',
+    )
+  }
 
-  public async publish(
+  public publish(
     candidates: readonly DesignCandidateData[],
-  ): Promise<Readonly<Record<DesignCandidateId, DesignCandidatePreviewTargetData>>> {
-    await this.start()
-
-    const origin = this.origin
-    if (origin === undefined) {
-      throw new Error('Web Design Agent preview runtime did not expose an origin.')
+    publicBaseUrl: string,
+  ): WebDesignAgentPreviewPublication {
+    if (this.publicationPaths.size >= this.maximumActivePublications) {
+      throw new Error(
+        'Web Design Agent preview publication capacity is exhausted.',
+      )
     }
 
+    const baseUrl = this.normalizeBaseUrl(publicBaseUrl)
+    const publicationId = randomBytes(24).toString('base64url')
     const targets = {} as Record<
       DesignCandidateId,
       DesignCandidatePreviewTargetData
     >
+    const pendingDocuments: Array<{readonly path: string; readonly html: string}> = []
+    let publicationBytes = 0
 
     for (const candidate of candidates) {
       const exported = this.exportBuilder.build(candidate, candidate.visualState)
       const fingerprint = this.fingerprint(candidate)
-      const path = `/candidate/${candidate.id.toLowerCase()}/${fingerprint}/`
-
-      this.documents.set(path, exported.standaloneHtml)
+      const path = `/preview/${publicationId}/${candidate.id.toLowerCase()}/${fingerprint}/`
+      publicationBytes += Buffer.byteLength(exported.standaloneHtml, 'utf8')
+      pendingDocuments.push({path, html: exported.standaloneHtml})
       targets[candidate.id] = {
         candidateId: candidate.id,
         fingerprint,
-        url: `${origin}${path}`,
+        url: new URL(path, baseUrl).href,
       }
     }
 
-    return targets
+    if (publicationBytes > this.maximumPublicationBytes) {
+      throw new Error(
+        `Web Design Agent final preview exceeds ${this.maximumPublicationBytes} bytes.`,
+      )
+    }
+
+    const paths = pendingDocuments.map((document) => document.path)
+    for (const document of pendingDocuments) {
+      this.documents.set(document.path, {
+        publicationId,
+        html: document.html,
+      })
+    }
+    this.publicationPaths.set(publicationId, paths)
+
+    return new WebDesignAgentPreviewPublication(targets, () => {
+      this.release(publicationId)
+    })
   }
 
-  public async close(): Promise<void> {
-    const server = this.server
-    this.server = undefined
-    this.origin = undefined
+  public read(path: string): WebDesignAgentPreviewResponseData | undefined {
+    const entry = this.documents.get(path)
+    if (entry === undefined) return undefined
+
+    return {
+      html: entry.html,
+      contentSecurityPolicy: PREVIEW_CONTENT_SECURITY_POLICY,
+    }
+  }
+
+  public close(): void {
     this.documents.clear()
-
-    if (server === undefined || !server.listening) return
-
-    await new Promise<void>((resolve, reject) => {
-      server.close((error) => {
-        if (error === undefined) resolve()
-        else reject(error)
-      })
-    })
+    this.publicationPaths.clear()
   }
 
-  private async start(): Promise<void> {
-    if (this.server !== undefined) return
+  private release(publicationId: string): void {
+    const paths = this.publicationPaths.get(publicationId)
+    if (paths === undefined) return
 
-    const server = createServer((request, response) => {
-      this.handleRequest(request.method, request.url, response)
-    })
-
-    await new Promise<void>((resolve, reject) => {
-      const onError = (error: Error): void => {
-        reject(error)
+    for (const path of paths) {
+      const entry = this.documents.get(path)
+      if (entry?.publicationId === publicationId) {
+        this.documents.delete(path)
       }
-
-      server.once('error', onError)
-      server.listen(0, '127.0.0.1', () => {
-        server.off('error', onError)
-        resolve()
-      })
-    })
-
-    const address = server.address()
-    if (address === null || typeof address === 'string') {
-      await new Promise<void>((resolve) => server.close(() => resolve()))
-      throw new Error('Web Design Agent preview runtime could not resolve its TCP address.')
     }
-
-    const port = (address as AddressInfo).port
-    this.server = server
-    this.origin = `http://127.0.0.1:${port}`
+    this.publicationPaths.delete(publicationId)
   }
 
-  private handleRequest(
-    method: string | undefined,
-    rawUrl: string | undefined,
-    response: ServerResponse,
-  ): void {
-    if (method !== 'GET') {
-      response.statusCode = 405
-      response.setHeader('Allow', 'GET')
-      response.end('Method Not Allowed')
-      return
+  private normalizeBaseUrl(value: string): URL {
+    const url = new URL(value)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      throw new TypeError('Web Design Agent public base URL must use HTTP(S).')
     }
-
-    const path = this.requestPath(rawUrl)
-    const document = path === undefined ? undefined : this.documents.get(path)
-
-    if (document === undefined) {
-      response.statusCode = 404
-      response.end('Not Found')
-      return
+    if (url.username.length > 0 || url.password.length > 0) {
+      throw new TypeError('Web Design Agent public base URL must not contain credentials.')
     }
-
-    response.statusCode = 200
-    response.setHeader('Content-Type', 'text/html; charset=utf-8')
-    response.setHeader('Cache-Control', 'no-store')
-    response.setHeader('Content-Security-Policy', PREVIEW_CONTENT_SECURITY_POLICY)
-    response.setHeader(
-      'Permissions-Policy',
-      'accelerometer=(), camera=(), geolocation=(), gyroscope=(), microphone=(), payment=(), usb=()',
-    )
-    response.setHeader('Referrer-Policy', 'no-referrer')
-    response.setHeader('X-Content-Type-Options', 'nosniff')
-    response.end(document)
-  }
-
-  private requestPath(rawUrl: string | undefined): string | undefined {
-    if (rawUrl === undefined) return undefined
-
-    try {
-      return new URL(rawUrl, 'http://127.0.0.1').pathname
-    } catch {
-      return undefined
+    if (url.search.length > 0 || url.hash.length > 0) {
+      throw new TypeError('Web Design Agent public base URL must not contain query or fragment data.')
     }
+    if (url.pathname !== '/') {
+      throw new TypeError('Web Design Agent public base URL must be an origin without a path prefix.')
+    }
+    return url
   }
 
   private fingerprint(candidate: DesignCandidateData): string {
@@ -175,5 +186,11 @@ export class WebDesignAgentPreviewRuntime {
     })
 
     return createHash('sha256').update(artifact).digest('hex')
+  }
+
+  private assertPositiveInteger(value: number, name: string): void {
+    if (!Number.isSafeInteger(value) || value <= 0) {
+      throw new RangeError(`${name} must be a positive integer.`)
+    }
   }
 }
