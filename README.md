@@ -46,7 +46,7 @@ MCP / CLI request
 
 The Design Director owns the main model/tool loop. Candidate specialists own implementation directions. The critic evaluates output without becoming a fourth implementation style. Optional concept-first generation is isolated behind its own specialist and external capability.
 
-The thin bridge has been physically validated against real `@strands-agents/sdk@1.16.0`, including native agent construction and a disposable real Strands + MCP integration flow.
+The thin bridge is physically validated against real `@strands-agents/sdk@1.16.0`, including native agent construction and a disposable real Strands + MCP integration flow.
 
 ## A/B/C contract
 
@@ -80,29 +80,43 @@ The MCP App review surface supports:
 
 The generated implementation remains immutable while the review UI keeps temporary visual state separately. A model call happens only when the user asks the agent to reconcile those preferences into a new implementation.
 
-The production MCP App has been built as one 438.66 kB HTML resource and browser-tested under the official MCP Apps `AppBridge`. That smoke validated A/B/C selection, route switching, three-way compare, live visual-variable editing, and `ui/update-model-context` handoff.
+The production MCP App is one 438.66 kB HTML resource and has been browser-tested under the official MCP Apps `AppBridge`. That smoke validated A/B/C selection, route switching, three-way compare, live visual-variable editing, and `ui/update-model-context` handoff.
 
 ## External design tools
 
-External capabilities are optional and deployment-owned:
+External capabilities are optional and deployment-owned. Candidate agents receive component/browser capabilities; the Design Director receives its specialist-agent tools; the critic does not open its own browser process; the Concept Artist receives only the concept-image capability.
 
 | Capability | Configuration | Behavior |
 | --- | --- | --- |
-| 21st component research | `API_KEY_21ST` | Adds `https://21st.dev/api/mcp` by default. Results are design inspiration; they do not force React/Tailwind into the target stack. |
-| Browser/render evidence | `WEB_DESIGN_AGENT_BROWSER_MCP_URL` | Enables truthful browser/reference/existing-site inspection. Reference and existing-site modes reject when this capability is absent. |
-| Higgsfield concept-first | `WEB_DESIGN_AGENT_ENABLE_HIGGSFIELD=true` | Adds `https://mcp.higgsfield.ai/mcp` by default to the concept specialist. Provider authorization remains deployment-owned. Concept images are references, not implementation evidence. |
+| 21st component research | `API_KEY_21ST` | Adds `https://21st.dev/api/mcp` with native Strands prefix `components`. Results are design inspiration; they do not force React/Tailwind into the target stack. |
+| Deployment browser MCP | `WEB_DESIGN_AGENT_BROWSER_MCP_URL` | Preferred browser path when supplied. Existing-site/reference modes reject when no browser capability exists. |
+| Local Playwright MCP | `WEB_DESIGN_AGENT_ENABLE_PLAYWRIGHT=true` | Uses official `@playwright/mcp@0.0.80` as a stdio MCP fallback. Browser tool names stay canonical, such as `browser_navigate`. |
+| Environment-owned browser executable | `WEB_DESIGN_AGENT_PLAYWRIGHT_EXECUTABLE_PATH` | Points Playwright MCP at an already-installed browser rather than downloading a browser per request. |
+| Environment-owned Playwright cache | `WEB_DESIGN_AGENT_PLAYWRIGHT_BROWSERS_PATH` or `PLAYWRIGHT_BROWSERS_PATH` | Passed explicitly into the MCP child because the MCP stdio transport intentionally inherits only a safe environment-variable subset. |
+| Higgsfield concept-first | `WEB_DESIGN_AGENT_ENABLE_HIGGSFIELD=true` | Adds `https://mcp.higgsfield.ai/mcp` to the Concept Artist. Provider authorization remains deployment-owned. Concept images are references, not implementation evidence. |
 
-Optional endpoint/provider overrides are available through the matching `WEB_DESIGN_AGENT_*` environment variables in `WebDesignAgentRuntimeConfigBuilder`.
+The browser configuration is typed directly against the native Strands `McpServerConfig` surface. There is no loose product-level MCP config cast hiding stale field names.
 
-A real Higgsfield concept image has been generated through the connected external surface. The Web Design Agent's own southbound Higgsfield MCP path through Strands remains a provider-credential integration gate. That does not change the NoAuth client contract of the Web Design Agent MCP endpoint.
+A physical browser integration test has initialized a real browser-enabled candidate through `StrandsAgentRuntimeBootstrap`, loaded 24 Playwright MCP tools, navigated to a real page, returned a real accessibility snapshot, captured a real PNG screenshot, and closed the Strands/runtime resources cleanly.
 
-## Run
+A real Higgsfield concept image has separately been generated through the connected external surface. The Web Design Agent's own southbound Higgsfield MCP path through Strands remains a provider-credential integration gate. That does not change the NoAuth client contract.
 
-After dependencies are installed:
+## Run and validate
+
+Install dependencies and run the core physical gate:
 
 ```bash
 npm run check:real
 ```
+
+For a durable DEVELOPMENT environment with an environment-owned browser executable, run the complete typed validation gate:
+
+```bash
+WEB_DESIGN_AGENT_PLAYWRIGHT_EXECUTABLE_PATH=/path/to/chrome \
+npm run check:durable
+```
+
+`check:durable` runs the core physical MCP gate, the physical Strands + Playwright MCP browser integration, and an npm package dry-run. Deployments using a non-default browser process command can set `WEB_DESIGN_AGENT_PLAYWRIGHT_MCP_COMMAND`.
 
 Start HTTP MCP:
 
@@ -133,26 +147,33 @@ node dist/evaluation/main.js
 Fresh Node `v22.23.2` physical validation currently passes:
 
 ```text
-npm install                                 PASS
-npm run typecheck                           PASS
-npm test                                    PASS (17 / 17)
-npm run test:integ:mcp                      PASS (1 / 1)
-production Vite MCP App build               PASS
-npm pack --dry-run                          PASS
-clean consumer tarball install              PASS
-packed MCP startup + eight-tool negotiation PASS
-official AppBridge Chromium interaction     PASS
+npm install                                      PASS
+@tjxjnoobie/strands-bridge@0.1.0                 PASS
+@strands-agents/sdk@1.16.0                       PASS
+npm run typecheck                                PASS
+npm test                                         PASS (25 / 25)
+npm run test:integ:mcp                           PASS (1 / 1)
+production Vite MCP App build                    PASS
+npm pack --dry-run                               PASS
+clean consumer tarball install                   PASS
+packed MCP startup + eight-tool negotiation      PASS
+official AppBridge Chromium interaction          PASS
+native Strands candidate + Playwright MCP init   PASS
+Playwright MCP browser tool catalog              PASS (24 tools)
+browser_navigate                                 PASS
+browser_snapshot                                 PASS
+browser_take_screenshot                          PASS
 ```
 
-The shared bridge separately passes its physical Strands 1.16.0 verification and native disposable Strands + MCP integration test.
+The clean external consumer receives `@tjxjnoobie/web-design-agent@0.2.0`, `@tjxjnoobie/strands-bridge@0.1.0`, and real Strands 1.16.0, then starts the NoAuth MCP binary and negotiates all eight WDA tools.
 
 The following remain promotion gates:
 
-- commit the reproducibly generated npm lockfile from the normal DEVELOPMENT environment;
-- authorized real Web Design Agent model generation;
+- commit the reproducibly generated npm lockfile from the normal durable DEVELOPMENT environment;
+- authorized real Web Design Agent model generation through Director + candidate specialists;
 - real 21st MCP use through Strands with the deployment-owned API key;
-- real southbound browser MCP render/critique/repair execution through the agent;
-- real southbound Higgsfield MCP concept-first execution through the agent with deployment-owned provider credentials;
+- use the now-proven browser capability inside the real model-led render -> inspect -> critique -> repair loop;
+- real southbound Higgsfield MCP concept-first execution through the Concept Artist with deployment-owned provider authorization;
 - hosted ChatGPT and Claude MCP App rendering;
 - real vague-prompt one-shot quality measurements.
 
