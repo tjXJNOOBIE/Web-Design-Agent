@@ -18,6 +18,12 @@ type WebDesignAgentMcpServerMap = Exclude<
   string
 >
 
+interface WebDesignAgentRuntimeToolPolicy {
+  readonly components: boolean
+  readonly browser: boolean
+  readonly conceptImages: boolean
+}
+
 export interface WebDesignAgentCapabilityData {
   readonly components: boolean
   readonly browser: boolean
@@ -49,7 +55,11 @@ export class WebDesignAgentRuntimeConfigBuilder {
       'Web Design Agent Director',
       WEB_DESIGN_AGENT_DIRECTOR_SYSTEM_PROMPT,
       agentTools,
-      false,
+      {
+        components: false,
+        browser: false,
+        conceptImages: false,
+      },
     )
   }
 
@@ -59,7 +69,11 @@ export class WebDesignAgentRuntimeConfigBuilder {
       `Web Design Candidate ${id}`,
       buildWebDesignCandidateSystemPrompt(id),
       [],
-      false,
+      {
+        components: true,
+        browser: true,
+        conceptImages: false,
+      },
     )
   }
 
@@ -69,7 +83,11 @@ export class WebDesignAgentRuntimeConfigBuilder {
       'Web Design Agent Visual Critic',
       WEB_DESIGN_AGENT_CRITIC_SYSTEM_PROMPT,
       [],
-      false,
+      {
+        components: false,
+        browser: false,
+        conceptImages: false,
+      },
     )
   }
 
@@ -79,7 +97,11 @@ export class WebDesignAgentRuntimeConfigBuilder {
       'Web Design Agent Concept Artist',
       WEB_DESIGN_AGENT_CONCEPT_SYSTEM_PROMPT,
       [],
-      true,
+      {
+        components: false,
+        browser: false,
+        conceptImages: true,
+      },
     )
   }
 
@@ -92,15 +114,20 @@ export class WebDesignAgentRuntimeConfigBuilder {
     name: string,
     systemPrompt: string,
     tools: readonly WebDesignAgentTool[],
-    includeConceptImages: boolean,
+    toolPolicy: WebDesignAgentRuntimeToolPolicy,
   ): StrandsAgentRuntimeConfig {
     const model = this.optionalString(this.environment['WEB_DESIGN_AGENT_MODEL_ID'])
     const mcpServers: WebDesignAgentMcpServerMap = {}
 
-    this.addComponentServer(mcpServers)
-    this.addBrowserServer(mcpServers)
+    if (toolPolicy.components) {
+      this.addComponentServer(mcpServers)
+    }
 
-    if (includeConceptImages) {
+    if (toolPolicy.browser) {
+      this.addBrowserServer(mcpServers)
+    }
+
+    if (toolPolicy.conceptImages) {
       this.addConceptImageServer(mcpServers)
     }
 
