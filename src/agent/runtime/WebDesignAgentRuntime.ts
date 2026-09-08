@@ -15,6 +15,10 @@ import type {DesignConceptSetData} from '../../design/data/DesignConceptData.js'
 import type {DesignGenerationRequest} from '../../design/data/DesignGenerationRequest.js'
 import type {DesignGenerationResult} from '../../design/data/DesignGenerationResult.js'
 import type {DesignRefinementRequest} from '../../design/data/DesignRefinementRequest.js'
+import {
+  type DesignCandidatePreviewTargetData,
+  WebDesignAgentPreviewRuntime,
+} from '../../design/preview/WebDesignAgentPreviewRuntime.js'
 import {DesignDistanceEvaluator} from '../../design/validation/DesignDistanceEvaluator.js'
 import {DesignGenerationResultParser} from '../../design/validation/DesignGenerationResultParser.js'
 import {DesignResultValidationError} from '../../design/validation/DesignResultValidationError.js'
@@ -35,6 +39,13 @@ interface ParsedGenerationInvocationData {
   readonly evidence: WebDesignAgentToolEvidenceCollector
 }
 
+interface FinalCandidatePreviewInspectionData {
+  readonly evidence: WebDesignAgentToolEvidenceCollector
+  readonly targets: Readonly<
+    Record<DesignCandidateId, DesignCandidatePreviewTargetData>
+  >
+}
+
 const FAILED_INVOCATION_STOP_REASONS = new Set([
   'cancelled',
   'limitTurns',
@@ -49,6 +60,7 @@ const FAILED_INVOCATION_STOP_REASONS = new Set([
 
 export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
   private closed = false
+  private previewRuntime?: WebDesignAgentPreviewRuntime
 
   public constructor(
     private readonly director: IStrandsAgentRuntime,
@@ -114,10 +126,17 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
 
     this.validatePages(request.pages, result.candidates)
 
+    const finalPreviewInspection = await this.inspectFinalCodeFirstCandidates(
+      result.candidates,
+      normalizedRequest,
+      cancelSignal,
+    )
+
     return this.applyRuntimeEvidence(
       result,
       invocation.evidence,
       normalizedRequest,
+      finalPreviewInspection,
     )
   }
 
@@ -198,6 +217,16 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
       }
     }
 
+    const previewRuntime = this.previewRuntime
+    this.previewRuntime = undefined
+    if (previewRuntime !== undefined) {
+      try {
+        await previewRuntime.close()
+      } catch (error) {
+        errors.push(error)
+      }
+    }
+
     if (errors.length > 0) {
       throw new AggregateError(
         errors,
@@ -219,6 +248,47 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
     return {
       result: this.parser.parseGeneration(invocation.text),
       evidence: invocation.evidence,
+    }
+  }
+
+  private async inspectFinalCodeFirstCandidates(
+    candidates: readonly DesignCandidateData[],
+    request: NormalizedDesignGenerationRequest,
+    cancelSignal?: AbortSignal,
+  ): Promise<FinalCandidatePreviewInspectionData | undefined> {
+    if (
+      request.sourceMode !== 'code-first' ||
+      this.expectedBrowserTarget(request) !== undefined ||
+      !this.capabilities.browser ||
+      this.capabilities.finalCandidatePreview !== true
+    ) {
+      return undefined
+    }
+
+    const previewRuntime =
+      this.previewRuntime ?? (this.previewRuntime = new WebDesignAgentPreviewRuntime())
+    const targets = await previewRuntime.publish(candidates)
+    const lines = [
+      'OPERATION: inspect-final-code-first-previews',
+      'The runtime has already parsed and frozen the exact final candidate artifacts.',
+      'Invoke candidate_a, candidate_b, and candidate_c. Tell each matching specialist to perform inspect-final-code-first-preview only.',
+      'Each specialist must browser_navigate to its exact assigned URL and then run browser_snapshot or browser_take_screenshot on that page.',
+      'Do not redesign, repair, rewrite, regenerate, or substitute any candidate or URL during this operation.',
+      'The runtime will ignore prose claims and accept only observed browser lifecycle evidence bound to the exact URLs below.',
+    ]
+
+    for (const candidateId of ['A', 'B', 'C'] as const) {
+      lines.push(
+        `Candidate ${candidateId} final preview: ${targets[candidateId].url}`,
+      )
+    }
+
+    lines.push('Return JSON only: {"inspected":["A","B","C"]}.')
+    const invocation = await this.streamDirector(lines.join('\n'), cancelSignal)
+
+    return {
+      evidence: invocation.evidence,
+      targets,
     }
   }
 
@@ -267,28 +337,50 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
     result: DesignGenerationResult,
     evidence: WebDesignAgentToolEvidenceCollector,
     request: NormalizedDesignGenerationRequest,
+    finalPreviewInspection?: FinalCandidatePreviewInspectionData,
   ): DesignGenerationResult {
     const candidateIds: readonly DesignCandidateId[] = result.candidates.map(
       (candidate) => candidate.id,
     )
     const expectedBrowserTarget = this.expectedBrowserTarget(request)
     const sourceBoundBrowserValidation = expectedBrowserTarget !== undefined
-    const missingBrowserInspection = this.capabilities.browser
+    const missingSourceInspection = this.capabilities.browser
       ? evidence.missingBrowserInspection(candidateIds, expectedBrowserTarget)
       : candidateIds
     const observedBrowserInspection =
       this.capabilities.browser &&
       evidence.missingBrowserInspection(candidateIds).length === 0
+    const missingFinalPreviewInspection =
+      finalPreviewInspection === undefined
+        ? candidateIds
+        : candidateIds.filter(
+            (candidateId) =>
+              !finalPreviewInspection.evidence.hasBrowserInspection(
+                candidateId,
+                finalPreviewInspection.targets[candidateId].url,
+              ),
+          )
+    const finalPreviewValidated =
+      finalPreviewInspection !== undefined &&
+      missingFinalPreviewInspection.length === 0
     const browserValidated =
-      sourceBoundBrowserValidation &&
       this.capabilities.browser &&
-      missingBrowserInspection.length === 0
-    const candidates = result.candidates.map((candidate) => ({
-      ...candidate,
-      browserEvidence: this.capabilities.browser
-        ? evidence.browserEvidence(candidate.id)
-        : [],
-    }))
+      (sourceBoundBrowserValidation
+        ? missingSourceInspection.length === 0
+        : finalPreviewValidated)
+    const candidates = result.candidates.map((candidate) => {
+      const browserEvidence = this.capabilities.browser
+        ? [
+            ...evidence.browserEvidence(candidate.id),
+            ...(finalPreviewInspection?.evidence.browserEvidence(candidate.id) ?? []),
+          ]
+        : []
+
+      return {
+        ...candidate,
+        browserEvidence: [...new Set(browserEvidence)].sort(),
+      }
+    })
     const notes = result.validation.notes.map(
       (note) => `Agent note (unverified): ${note}`,
     )
@@ -297,21 +389,33 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
       notes.push(
         'Runtime evidence: browser validation was not executed because no browser MCP capability was configured.',
       )
-    } else if (browserValidated) {
+    } else if (sourceBoundBrowserValidation && browserValidated) {
       notes.push(
         'Runtime evidence: successful browser inspection of the required source target was observed for candidates A, B, and C.',
       )
-    } else if (!sourceBoundBrowserValidation && observedBrowserInspection) {
+    } else if (sourceBoundBrowserValidation) {
       notes.push(
-        'Runtime evidence: browser activity was observed for candidates A, B, and C, but the final returned candidate implementations are not yet deterministically render-bound; browserValidated remains false.',
+        `Runtime evidence: required browser inspection was not observed for candidates ${missingSourceInspection.join(', ')}.`,
       )
-    } else if (!sourceBoundBrowserValidation) {
+    } else if (finalPreviewValidated) {
       notes.push(
-        'Runtime evidence: final returned candidate implementations are not yet deterministically render-bound, so code-first browserValidated remains false.',
+        'Runtime evidence: the exact final A/B/C artifacts were published to content-addressed runtime previews and successfully inspected with browser tooling.',
+      )
+    } else if (finalPreviewInspection !== undefined) {
+      notes.push(
+        `Runtime evidence: final content-addressed preview inspection was not observed for candidates ${missingFinalPreviewInspection.join(', ')}; browserValidated remains false.`,
+      )
+    } else if (observedBrowserInspection) {
+      notes.push(
+        'Runtime evidence: browser activity was observed for candidates A, B, and C, but the final returned candidate implementations were not content-addressed and inspected; browserValidated remains false.',
+      )
+    } else if (this.capabilities.finalCandidatePreview !== true) {
+      notes.push(
+        'Runtime evidence: this browser configuration cannot reach WDA\'s generation-owned loopback preview, so code-first final-artifact binding was not executed and browserValidated remains false.',
       )
     } else {
       notes.push(
-        `Runtime evidence: required browser inspection was not observed for candidates ${missingBrowserInspection.join(', ')}.`,
+        'Runtime evidence: final returned candidate implementations were not successfully content-addressed and inspected, so code-first browserValidated remains false.',
       )
     }
 
@@ -330,9 +434,13 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
       }
     }
 
-    if (this.requiresBrowser(request) && !browserValidated) {
+    if (
+      this.requiresBrowser(request) &&
+      sourceBoundBrowserValidation &&
+      missingSourceInspection.length > 0
+    ) {
       throw new DesignResultValidationError(
-        `This design mode requires successful browser inspection of its source for every candidate; missing runtime evidence for ${missingBrowserInspection.join(', ')}.`,
+        `This design mode requires successful browser inspection of its source for every candidate; missing runtime evidence for ${missingSourceInspection.join(', ')}.`,
       )
     }
 
