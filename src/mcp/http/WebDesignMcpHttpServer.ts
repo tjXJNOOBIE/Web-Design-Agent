@@ -172,6 +172,7 @@ export class WebDesignMcpHttpServer {
     response: ServerResponse,
   ): Promise<void> {
     let closePromise: Promise<void> | undefined
+    let observedClosePromise: Promise<void> | undefined
     let mcpServer: ReturnType<WebDesignMcpServerBuilder['build']> | undefined
     let transport: StreamableHTTPServerTransport | undefined
 
@@ -185,9 +186,15 @@ export class WebDesignMcpHttpServer {
       })()
       return closePromise
     }
+    const closeObserved = (): Promise<void> => {
+      observedClosePromise ??= close().catch((error: unknown) => {
+        this.reportRequestCleanupFailure(error)
+      })
+      return observedClosePromise
+    }
 
     response.once('close', () => {
-      void close()
+      void closeObserved()
     })
 
     try {
@@ -227,7 +234,7 @@ export class WebDesignMcpHttpServer {
         'Internal Web Design Agent server error.',
       )
     } finally {
-      await close().catch(() => undefined)
+      await closeObserved()
     }
   }
 
@@ -346,6 +353,13 @@ export class WebDesignMcpHttpServer {
         error: {code, message},
         id: null,
       }),
+    )
+  }
+
+  private reportRequestCleanupFailure(error: unknown): void {
+    console.error(
+      'Web Design Agent request cleanup failed:',
+      error instanceof Error ? error.message : String(error),
     )
   }
 
