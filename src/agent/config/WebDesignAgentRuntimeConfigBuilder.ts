@@ -173,17 +173,29 @@ export class WebDesignAgentRuntimeConfigBuilder {
         this.optionalString(
           this.environment['WEB_DESIGN_AGENT_PLAYWRIGHT_MCP_COMMAND'],
         ) ?? 'npx',
-      args: [
-        '-y',
-        this.optionalString(
-          this.environment['WEB_DESIGN_AGENT_PLAYWRIGHT_MCP_PACKAGE'],
-        ) ?? '@playwright/mcp@0.0.80',
-        '--browser=chromium',
-        '--headless',
-        '--isolated',
-      ],
+      args: this.buildPlaywrightArgs(),
       continueOnError: false,
     }
+  }
+
+  private buildPlaywrightArgs(): string[] {
+    const packageSpec =
+      this.optionalString(
+        this.environment['WEB_DESIGN_AGENT_PLAYWRIGHT_MCP_PACKAGE'],
+      ) ?? '@playwright/mcp@0.0.80'
+    const executablePath = this.optionalString(
+      this.environment['WEB_DESIGN_AGENT_PLAYWRIGHT_EXECUTABLE_PATH'],
+    )
+
+    return [
+      '-y',
+      packageSpec,
+      ...(executablePath === undefined
+        ? ['--browser=chromium']
+        : [`--executable-path=${executablePath}`]),
+      '--headless',
+      '--isolated',
+    ]
   }
 
   private addConceptImageServer(mcpServers: WebDesignAgentMcpServerMap): void {
