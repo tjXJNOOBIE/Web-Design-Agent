@@ -1,19 +1,19 @@
-import type { IStrandsAgentRuntime } from '@tjxjnoobie/strands-bridge'
+import type {IStrandsAgentRuntime} from '@tjxjnoobie/strands-bridge'
 
-import type { WebDesignAgentCapabilityData } from '../config/WebDesignAgentRuntimeConfigBuilder.js'
-import { WebDesignAgentToolEvidenceCollector } from '../evidence/WebDesignAgentToolEvidenceCollector.js'
-import type { IWebDesignAgentRuntime } from './IWebDesignAgentRuntime.js'
+import type {WebDesignAgentCapabilityData} from '../config/WebDesignAgentRuntimeConfigBuilder.js'
+import {WebDesignAgentToolEvidenceCollector} from '../evidence/WebDesignAgentToolEvidenceCollector.js'
+import type {IWebDesignAgentRuntime} from './IWebDesignAgentRuntime.js'
 import type {
   DesignCandidateData,
   DesignCandidateId,
 } from '../../design/data/DesignCandidateData.js'
-import type { DesignConceptSetData } from '../../design/data/DesignConceptData.js'
-import type { DesignGenerationRequest } from '../../design/data/DesignGenerationRequest.js'
-import type { DesignGenerationResult } from '../../design/data/DesignGenerationResult.js'
-import type { DesignRefinementRequest } from '../../design/data/DesignRefinementRequest.js'
-import { DesignDistanceEvaluator } from '../../design/validation/DesignDistanceEvaluator.js'
-import { DesignGenerationResultParser } from '../../design/validation/DesignGenerationResultParser.js'
-import { DesignResultValidationError } from '../../design/validation/DesignResultValidationError.js'
+import type {DesignConceptSetData} from '../../design/data/DesignConceptData.js'
+import type {DesignGenerationRequest} from '../../design/data/DesignGenerationRequest.js'
+import type {DesignGenerationResult} from '../../design/data/DesignGenerationResult.js'
+import type {DesignRefinementRequest} from '../../design/data/DesignRefinementRequest.js'
+import {DesignDistanceEvaluator} from '../../design/validation/DesignDistanceEvaluator.js'
+import {DesignGenerationResultParser} from '../../design/validation/DesignGenerationResultParser.js'
+import {DesignResultValidationError} from '../../design/validation/DesignResultValidationError.js'
 
 interface StreamedDirectorInvocationData {
   readonly text: string
@@ -129,20 +129,25 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
       )
     }
 
-    return this.parser.parseConceptSet(
-      (
-        await this.director.invokeAgent(
-          `OPERATION: concept-first\nPrompt: ${normalized}\nInvoke concept_artist and return exactly three real A/B/C concept results as JSON.`,
-        )
-      ).toString(),
-      normalized,
+    const invocation = await this.streamDirector(
+      `OPERATION: concept-first\nPrompt: ${normalized}\nInvoke concept_artist, use its real image-provider results, and return exactly three real A/B/C concept results as JSON.`,
     )
+    const concepts = this.parser.parseConceptSet(invocation.text, normalized)
+
+    if (!invocation.evidence.hasConceptProviderCall()) {
+      throw new DesignResultValidationError(
+        'Concept-first generation returned no successful runtime evidence from the configured image provider.',
+      )
+    }
+
+    return {
+      ...concepts,
+      providerEvidence: invocation.evidence.conceptProviderEvidence(),
+    }
   }
 
   public async close(): Promise<void> {
-    if (this.closed) {
-      return
-    }
+    if (this.closed) return
 
     this.closed = true
     const errors: unknown[] = []
@@ -237,6 +242,21 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
       )
     }
 
+    if (this.capabilities.components) {
+      const missingComponentResearch =
+        evidence.missingComponentResearch(candidateIds)
+
+      if (missingComponentResearch.length === 0) {
+        notes.push(
+          'Runtime evidence: component research was observed for candidates A, B, and C.',
+        )
+      } else {
+        notes.push(
+          `Runtime evidence: component research was not observed for candidates ${missingComponentResearch.join(', ')}.`,
+        )
+      }
+    }
+
     if (this.requiresBrowser(request) && !browserValidated) {
       throw new DesignResultValidationError(
         `This design mode requires successful browser inspection for every candidate; missing runtime evidence for ${missingBrowserInspection.join(', ')}.`,
@@ -295,10 +315,7 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
   }
 
   private requiresBrowser(
-    request: Pick<
-      DesignGenerationRequest,
-      'sourceMode' | 'targetUrl'
-    >,
+    request: Pick<DesignGenerationRequest, 'sourceMode' | 'targetUrl'>,
   ): boolean {
     return (
       request.sourceMode === 'reference-image' ||
@@ -311,9 +328,7 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
     requested: readonly string[] | undefined,
     candidates: readonly DesignCandidateData[],
   ): void {
-    if (requested === undefined) {
-      return
-    }
+    if (requested === undefined) return
 
     const required = requested
       .map((path) => path.trim())
