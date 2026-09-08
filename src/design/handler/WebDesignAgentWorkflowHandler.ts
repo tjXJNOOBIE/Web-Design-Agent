@@ -15,18 +15,23 @@ export class WebDesignAgentWorkflowHandler implements IWebDesignAgentWorkflowHan
 
   public async generate(
     request: DesignGenerationRequest,
+    cancelSignal?: AbortSignal,
   ): Promise<DesignGenerationResult> {
-    return this.withRuntime((runtime) => runtime.generate(request))
+    return this.withRuntime((runtime) => runtime.generate(request, cancelSignal))
   }
 
   public async refine(
     request: DesignRefinementRequest,
+    cancelSignal?: AbortSignal,
   ): Promise<DesignCandidateData> {
-    return this.withRuntime((runtime) => runtime.refine(request))
+    return this.withRuntime((runtime) => runtime.refine(request, cancelSignal))
   }
 
-  public async createConcepts(prompt: string): Promise<DesignConceptSetData> {
-    return this.withRuntime((runtime) => runtime.createConcepts(prompt))
+  public async createConcepts(
+    prompt: string,
+    cancelSignal?: AbortSignal,
+  ): Promise<DesignConceptSetData> {
+    return this.withRuntime((runtime) => runtime.createConcepts(prompt, cancelSignal))
   }
 
   private async withRuntime<T>(
