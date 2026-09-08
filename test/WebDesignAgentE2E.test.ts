@@ -1,36 +1,55 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { WebDesignAgentRuntimeConfigBuilder } from '../src/agent/config/WebDesignAgentRuntimeConfigBuilder.js'
-import { WebDesignAgentRuntime } from '../src/agent/runtime/WebDesignAgentRuntime.js'
-import { WebDesignAgentRuntimeBuilder } from '../src/agent/runtime/WebDesignAgentRuntimeBuilder.js'
-import { DesignExportBuilder } from '../src/design/export/DesignExportBuilder.js'
-import { WebDesignAgentWorkflowHandler } from '../src/design/handler/WebDesignAgentWorkflowHandler.js'
-import { DesignDistanceEvaluator } from '../src/design/validation/DesignDistanceEvaluator.js'
-import { DesignGenerationResultParser } from '../src/design/validation/DesignGenerationResultParser.js'
-import { OneShotDesignEvaluationHandler } from '../src/evaluation/handler/OneShotDesignEvaluationHandler.js'
-import { PreviewDocumentBuilder } from '../src/mcp-app/PreviewDocumentBuilder.js'
-import { candidate, generation } from './fixture/DesignFixture.js'
-import { FakeBootstrap, FakeRuntime } from './fake/FakeStrands.js'
+import {WebDesignAgentRuntimeConfigBuilder} from '../src/agent/config/WebDesignAgentRuntimeConfigBuilder.js'
+import {WebDesignAgentRuntime} from '../src/agent/runtime/WebDesignAgentRuntime.js'
+import {WebDesignAgentRuntimeBuilder} from '../src/agent/runtime/WebDesignAgentRuntimeBuilder.js'
+import {DesignExportBuilder} from '../src/design/export/DesignExportBuilder.js'
+import {WebDesignAgentWorkflowHandler} from '../src/design/handler/WebDesignAgentWorkflowHandler.js'
+import {DesignDistanceEvaluator} from '../src/design/validation/DesignDistanceEvaluator.js'
+import {DesignGenerationResultParser} from '../src/design/validation/DesignGenerationResultParser.js'
+import {OneShotDesignEvaluationHandler} from '../src/evaluation/handler/OneShotDesignEvaluationHandler.js'
+import {PreviewDocumentBuilder} from '../src/mcp-app/PreviewDocumentBuilder.js'
+import {candidate, generation} from './fixture/DesignFixture.js'
+import {FakeBootstrap, FakeRuntime} from './fake/FakeStrands.js'
 
 const json = () => JSON.stringify(generation())
+const PUBLIC_TARGET = 'https://example.com/'
 
 function browserToolEvent(
   candidateId: 'a' | 'b' | 'c',
-  toolName = 'browser_snapshot',
+  toolName: string,
   status: 'success' | 'error' = 'success',
+  targetUrl = PUBLIC_TARGET,
 ): unknown {
   return {
     type: 'toolStreamUpdateEvent',
     event: {
       data: {
         type: 'afterToolCallEvent',
-        agent: { id: `web-design-agent-candidate-${candidateId}` },
-        toolUse: { name: toolName },
-        result: { status },
+        agent: {id: `web-design-agent-candidate-${candidateId}`},
+        toolUse: {
+          name: toolName,
+          ...(toolName === 'browser_navigate'
+            ? {input: {url: targetUrl}}
+            : {}),
+        },
+        result: {status},
       },
     },
   }
+}
+
+function browserInspectionEvents(
+  candidateId: 'a' | 'b' | 'c',
+  inspectionTool = 'browser_snapshot',
+  inspectionStatus: 'success' | 'error' = 'success',
+  targetUrl = PUBLIC_TARGET,
+): unknown[] {
+  return [
+    browserToolEvent(candidateId, 'browser_navigate', 'success', targetUrl),
+    browserToolEvent(candidateId, inspectionTool, inspectionStatus, targetUrl),
+  ]
 }
 
 test('runtime config reports optional capabilities', () => {
@@ -40,7 +59,7 @@ test('runtime config reports optional capabilities', () => {
       WEB_DESIGN_AGENT_BROWSER_MCP_URL: 'https://browser',
       WEB_DESIGN_AGENT_ENABLE_HIGGSFIELD: 'yes',
     }).capabilities(),
-    { components: true, browser: true, conceptImages: true },
+    {components: true, browser: true, conceptImages: true},
   )
 })
 
@@ -49,9 +68,9 @@ test('runtime records browser validation false when browser is absent', async ()
   const agent = new WebDesignAgentRuntime(
     runtime,
     [runtime],
-    { components: false, browser: false, conceptImages: false },
+    {components: false, browser: false, conceptImages: false},
   )
-  const result = await agent.generate({ prompt: 'site' })
+  const result = await agent.generate({prompt: 'site'})
 
   assert.equal(result.validation.browserValidated, false)
   assert.match(result.validation.notes.at(-1) ?? '', /browser validation was not executed/i)
@@ -77,61 +96,74 @@ test('model cannot self-certify browser validation without observed Strands tool
   const agent = new WebDesignAgentRuntime(
     runtime,
     [runtime],
-    { components: false, browser: true, conceptImages: false },
+    {components: false, browser: true, conceptImages: false},
   )
 
-  const result = await agent.generate({ prompt: 'site' })
+  const result = await agent.generate({prompt: 'site'})
 
   assert.equal(result.validation.browserValidated, false)
   assert.ok(result.candidates.every((item) => item.browserEvidence.length === 0))
   assert.match(result.validation.notes[0] ?? '', /Agent note \(unverified\)/)
-  assert.match(result.validation.notes.at(-1) ?? '', /not observed for candidates A, B, C/)
+  assert.match(result.validation.notes.at(-1) ?? '', /candidates A, B, C/)
 })
 
-test('runtime grounds browser validation in successful candidate Strands tool events', async () => {
+test('runtime grounds browser validation in navigation-bound candidate Strands tool events', async () => {
   const runtime = new FakeRuntime(json())
   runtime.streamEvents.push([
-    browserToolEvent('a'),
-    browserToolEvent('a', 'browser_navigate'),
-    browserToolEvent('b'),
+    ...browserInspectionEvents('a'),
+    ...browserInspectionEvents('b'),
+    ...browserInspectionEvents('c', 'browser_take_screenshot'),
+  ])
+  const agent = new WebDesignAgentRuntime(
+    runtime,
+    [runtime],
+    {components: false, browser: true, conceptImages: false},
+  )
+
+  const result = await agent.generate({prompt: 'site'})
+
+  assert.equal(result.validation.browserValidated, true)
+  assert.match(result.candidates[0]?.browserEvidence[0] ?? '', /browser_snapshot.*example\.com/i)
+  assert.match(result.candidates[1]?.browserEvidence[0] ?? '', /browser_snapshot.*example\.com/i)
+  assert.match(result.candidates[2]?.browserEvidence[0] ?? '', /browser_take_screenshot.*example\.com/i)
+  assert.match(result.validation.notes.at(-1) ?? '', /navigation-bound inspection/i)
+})
+
+test('snapshot without successful navigation cannot satisfy runtime inspection evidence', async () => {
+  const runtime = new FakeRuntime(json())
+  runtime.streamEvents.push([
+    browserToolEvent('a', 'browser_snapshot'),
+    browserToolEvent('b', 'browser_snapshot'),
     browserToolEvent('c', 'browser_take_screenshot'),
   ])
   const agent = new WebDesignAgentRuntime(
     runtime,
     [runtime],
-    { components: false, browser: true, conceptImages: false },
+    {components: false, browser: true, conceptImages: false},
   )
 
-  const result = await agent.generate({ prompt: 'site' })
+  const result = await agent.generate({prompt: 'site'})
 
-  assert.equal(result.validation.browserValidated, true)
-  assert.deepEqual(result.candidates[0]?.browserEvidence, [
-    'browser_navigate executed successfully.',
-    'browser_snapshot executed successfully.',
-  ])
-  assert.deepEqual(result.candidates[1]?.browserEvidence, [
-    'browser_snapshot executed successfully.',
-  ])
-  assert.deepEqual(result.candidates[2]?.browserEvidence, [
-    'browser_take_screenshot executed successfully.',
-  ])
-  assert.match(result.validation.notes.at(-1) ?? '', /successful browser inspection was observed/)
+  assert.equal(result.validation.browserValidated, false)
+  assert.ok(result.candidates.every((item) => item.browserEvidence.length === 0))
 })
 
-test('failed browser calls cannot satisfy runtime inspection evidence', async () => {
+test('failed navigation clears the browser target before a later snapshot', async () => {
   const runtime = new FakeRuntime(json())
   runtime.streamEvents.push([
-    browserToolEvent('a'),
-    browserToolEvent('b'),
-    browserToolEvent('c', 'browser_snapshot', 'error'),
+    ...browserInspectionEvents('a'),
+    ...browserInspectionEvents('b'),
+    browserToolEvent('c', 'browser_navigate'),
+    browserToolEvent('c', 'browser_navigate', 'error', 'https://other.example.com/'),
+    browserToolEvent('c', 'browser_snapshot'),
   ])
   const agent = new WebDesignAgentRuntime(
     runtime,
     [runtime],
-    { components: false, browser: true, conceptImages: false },
+    {components: false, browser: true, conceptImages: false},
   )
 
-  const result = await agent.generate({ prompt: 'site' })
+  const result = await agent.generate({prompt: 'site'})
 
   assert.equal(result.validation.browserValidated, false)
   assert.deepEqual(result.candidates[2]?.browserEvidence, [])
@@ -143,9 +175,9 @@ test('runtime refinement carries visual state', async () => {
   const agent = new WebDesignAgentRuntime(
     runtime,
     [runtime],
-    { components: false, browser: false, conceptImages: false },
+    {components: false, browser: false, conceptImages: false},
   )
-  const state = { ...candidate('B', 1).visualState, radius: 4 }
+  const state = {...candidate('B', 1).visualState, radius: 4}
 
   await agent.refine({
     candidate: candidate('B', 1),
@@ -159,15 +191,15 @@ test('runtime refinement carries visual state', async () => {
 test('runtime refinement replaces model evidence with observed selected-candidate evidence', async () => {
   const base = candidate('B', 1)
   const runtime = new FakeRuntime(
-    JSON.stringify({ ...base, browserEvidence: ['invented evidence'] }),
+    JSON.stringify({...base, browserEvidence: ['invented evidence']}),
   )
   runtime.streamEvents.push([
-    browserToolEvent('b', 'browser_take_screenshot'),
+    ...browserInspectionEvents('b', 'browser_take_screenshot'),
   ])
   const agent = new WebDesignAgentRuntime(
     runtime,
     [runtime],
-    { components: false, browser: true, conceptImages: false },
+    {components: false, browser: true, conceptImages: false},
   )
 
   const result = await agent.refine({
@@ -176,9 +208,27 @@ test('runtime refinement replaces model evidence with observed selected-candidat
     feedback: 'keep this',
   })
 
-  assert.deepEqual(result.browserEvidence, [
-    'browser_take_screenshot executed successfully.',
-  ])
+  assert.equal(result.browserEvidence.length, 1)
+  assert.match(result.browserEvidence[0] ?? '', /browser_take_screenshot.*example\.com/i)
+})
+
+test('runtime rejects a refinement result for a different candidate id', async () => {
+  const runtime = new FakeRuntime(JSON.stringify(candidate('A', 0)))
+  const agent = new WebDesignAgentRuntime(
+    runtime,
+    [runtime],
+    {components: false, browser: false, conceptImages: false},
+  )
+
+  await assert.rejects(
+    () =>
+      agent.refine({
+        candidate: candidate('B', 1),
+        visualState: candidate('B', 1).visualState,
+        feedback: 'refine B',
+      }),
+    /requested candidate B.*returned candidate A/i,
+  )
 })
 
 test('runtime enforces requested multi-page routes', async () => {
@@ -186,21 +236,21 @@ test('runtime enforces requested multi-page routes', async () => {
   const agent = new WebDesignAgentRuntime(
     runtime,
     [runtime],
-    { components: false, browser: false, conceptImages: false },
+    {components: false, browser: false, conceptImages: false},
   )
 
   await assert.rejects(
-    () => agent.generate({ prompt: 'site', pages: ['/pricing'] }),
+    () => agent.generate({prompt: 'site', pages: ['/pricing']}),
     /missing requested page routes/,
   )
 })
 
-test('runtime refuses existing-site mode without browser capability', async () => {
+test('runtime refuses existing-site without browser capability', async () => {
   const runtime = new FakeRuntime(json())
   const agent = new WebDesignAgentRuntime(
     runtime,
     [runtime],
-    { components: false, browser: false, conceptImages: false },
+    {components: false, browser: false, conceptImages: false},
   )
 
   await assert.rejects(
@@ -208,18 +258,18 @@ test('runtime refuses existing-site mode without browser capability', async () =
       agent.generate({
         prompt: 'redesign',
         sourceMode: 'existing-site',
-        targetUrl: 'https://x',
+        targetUrl: PUBLIC_TARGET,
       }),
     /requires configured browser/,
   )
 })
 
-test('runtime refuses existing-site mode when browser is configured but inspection did not execute', async () => {
+test('runtime refuses existing-site mode when browser is configured but source inspection did not execute', async () => {
   const runtime = new FakeRuntime(json())
   const agent = new WebDesignAgentRuntime(
     runtime,
     [runtime],
-    { components: false, browser: true, conceptImages: false },
+    {components: false, browser: true, conceptImages: false},
   )
 
   await assert.rejects(
@@ -227,9 +277,9 @@ test('runtime refuses existing-site mode when browser is configured but inspecti
       agent.generate({
         prompt: 'redesign',
         sourceMode: 'existing-site',
-        targetUrl: 'https://x',
+        targetUrl: PUBLIC_TARGET,
       }),
-    /requires successful browser inspection.*A, B, C/,
+    /requires successful browser inspection of its source.*A, B, C/,
   )
 })
 
@@ -274,7 +324,7 @@ test('export builder applies visual state and escapes closing scripts', () => {
   const base = candidate('A', 0)
   const changed = {
     ...base,
-    document: { ...base.document, javascript: 'x="</script>"' },
+    document: {...base.document, javascript: 'x="</script>"'},
   }
   const output = new DesignExportBuilder().build(changed, {
     ...changed.visualState,
@@ -291,14 +341,14 @@ test('workflow closes runtime after success', async () => {
     build: async () => ({
       generate: async () => generation(),
       refine: async () => candidate('A', 0),
-      createConcepts: async () => ({ prompt: 'x', concepts: [] }),
+      createConcepts: async () => ({prompt: 'x', concepts: []}),
       close: async () => {
         closed += 1
       },
     }),
   }
 
-  await new WebDesignAgentWorkflowHandler(runtimeBuilder).generate({ prompt: 'x' })
+  await new WebDesignAgentWorkflowHandler(runtimeBuilder).generate({prompt: 'x'})
   assert.equal(closed, 1)
 })
 
@@ -311,8 +361,8 @@ test('distance evaluator accepts structurally distinct candidates', () => {
 
 test('distance evaluator rejects cosmetic variants', () => {
   const a = candidate('A', 0)
-  const b = { ...a, id: 'B' as const }
-  const c = { ...a, id: 'C' as const }
+  const b = {...a, id: 'B' as const}
+  const c = {...a, id: 'C' as const}
 
   assert.equal(new DesignDistanceEvaluator().evaluate([a, b, c]).passed, false)
 })
@@ -346,7 +396,7 @@ test('evaluation reports only objective metrics', async () => {
   const workflow: any = {
     generate: async () => ({
       ...generation(),
-      validation: { ...generation().validation, browserValidated: true },
+      validation: {...generation().validation, browserValidated: true},
     }),
   }
 
