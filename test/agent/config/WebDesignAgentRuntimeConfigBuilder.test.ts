@@ -43,6 +43,7 @@ test('configures official Playwright MCP as an opt-in browser capability', () =>
   assert.deepEqual(servers['browser']?.args, [
     '-y',
     '@playwright/mcp@0.0.80',
+    '--browser=chromium',
     '--headless',
     '--isolated',
   ])
