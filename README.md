@@ -61,7 +61,24 @@ Every candidate also carries:
 - design-system tokens, typography, reusable component names, and principles;
 - live visual-state defaults;
 - critique notes;
-- browser evidence only when browser tooling actually executed.
+- runtime-grounded browser evidence when browser tools actually executed.
+
+## Runtime-grounded browser evidence
+
+Web Design Agent does **not** trust the model to certify that visual validation happened.
+
+Generation and refinement consume the native Strands event stream. Successful candidate `browser_*` calls are observed from real nested Strands `AfterToolCallEvent` lifecycle events and converted into product evidence by `WebDesignAgentToolEvidenceCollector`.
+
+Consequences:
+
+- model-authored `validation.browserValidated` is ignored;
+- model-authored candidate `browserEvidence` is replaced;
+- failed browser calls do not count;
+- `browserValidated` is true only when A, B, and C each have successful inspection evidence from `browser_snapshot` or `browser_take_screenshot`;
+- existing-site/reference-image work fails if the required real browser inspection was not observed, even when a browser capability was merely configured;
+- model-authored validation notes are retained only as explicitly unverified agent notes.
+
+The point is mundane but important: configuring a browser is not evidence that anybody used it. Software has enough ceremonies already.
 
 ## Live visual review
 
@@ -151,7 +168,7 @@ npm install                                      PASS
 @tjxjnoobie/strands-bridge@0.1.0                 PASS
 @strands-agents/sdk@1.16.0                       PASS
 npm run typecheck                                PASS
-npm test                                         PASS (25 / 25)
+npm test                                         PASS (30 / 30)
 npm run test:integ:mcp                           PASS (1 / 1)
 production Vite MCP App build                    PASS
 npm pack --dry-run                               PASS
@@ -163,6 +180,8 @@ Playwright MCP browser tool catalog              PASS (24 tools)
 browser_navigate                                 PASS
 browser_snapshot                                 PASS
 browser_take_screenshot                          PASS
+runtime-grounded browser evidence tests          PASS
+model self-certification rejected                PASS
 ```
 
 The clean external consumer receives `@tjxjnoobie/web-design-agent@0.2.0`, `@tjxjnoobie/strands-bridge@0.1.0`, and real Strands 1.16.0, then starts the NoAuth MCP binary and negotiates all eight WDA tools.
@@ -172,7 +191,7 @@ The following remain promotion gates:
 - commit the reproducibly generated npm lockfile from the normal durable DEVELOPMENT environment;
 - authorized real Web Design Agent model generation through Director + candidate specialists;
 - real 21st MCP use through Strands with the deployment-owned API key;
-- use the now-proven browser capability inside the real model-led render -> inspect -> critique -> repair loop;
+- use the now-proven browser capability and runtime evidence collector inside the real model-led render -> inspect -> critique -> repair loop;
 - real southbound Higgsfield MCP concept-first execution through the Concept Artist with deployment-owned provider authorization;
 - hosted ChatGPT and Claude MCP App rendering;
 - real vague-prompt one-shot quality measurements.
