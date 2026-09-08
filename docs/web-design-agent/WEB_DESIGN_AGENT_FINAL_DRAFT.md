@@ -1,7 +1,7 @@
 # Web Design Agent Final Draft
 
 > **Status:** Working product and architecture contract  
-> **Owns:** Web design workflow, A/B/C policy, product prompts/contracts, NoAuth MCP surface, MCP App review experience, design-tool selection, and product validation policy  
+> **Owns:** Web design workflow, A/B/C policy, product prompts/contracts, NoAuth MCP surface, MCP App review experience, design-tool selection, request safety, and product validation policy  
 > **Must not define:** Shared Strands SDK mechanics, a replacement agent framework, Tavall Java infrastructure, provider implementations, client authentication requirements, or claims unsupported by runtime evidence
 
 ## About
@@ -22,6 +22,7 @@ This repository owns:
 - design intent, design-system, visual-state, multi-page, concept, export, and preference-profile contracts;
 - external design-tool selection and role assignment;
 - runtime evidence interpretation;
+- public input and browser-target policy;
 - the public NoAuth MCP product surface;
 - the MCP App review/editor;
 - product evaluation and promotion policy.
@@ -46,23 +47,32 @@ WDA deterministic validation + runtime evidence
 
 Every public workflow call builds a fresh composition and closes lifecycle-owned resources after the call. Public HTTP requests therefore do not share model conversation state.
 
+The WDA model baseline is pinned explicitly rather than inheriting a moving SDK default. `WEB_DESIGN_AGENT_MODEL_ID` remains a deployment override.
+
+## Invocation budget rule
+
+Public and local workflows use native Strands invocation controls rather than a parallel watchdog system.
+
+The default product budget is:
+
+```text
+wall-clock timeout     240 seconds
+max turns              16
+max output tokens      60,000
+max total tokens       200,000
+```
+
+Deployments may override these through the documented `WEB_DESIGN_AGENT_*` invocation variables.
+
+The Director receives native Strands `cancelSignal` and `limits`. Cancellation, turn/token exhaustion, provider refusal, guardrail intervention, or context-window exhaustion is treated as an incomplete product result rather than handing truncated output to the JSON parser.
+
+For MCP calls, the request-scoped MCP abort signal is combined with the WDA timeout. An already-cancelled request is rejected before runtime construction, so a disconnected client does not create five agents and southbound MCP clients merely to discover that nobody is listening.
+
 ## A/B/C rule
 
 Material generation returns exactly A, B, and C. They must differ structurally, not merely by palette or border radius.
 
-Every candidate has a Design Genome covering:
-
-- composition;
-- navigation;
-- hero strategy;
-- typography;
-- density;
-- geometry;
-- surface model;
-- depth;
-- motion;
-- content rhythm;
-- imagery strategy.
+Every candidate has a Design Genome covering composition, navigation, hero strategy, typography, density, geometry, surface model, depth, motion, content rhythm, and imagery strategy.
 
 `DesignDistanceEvaluator` scores every candidate pair. One full regeneration attempt is permitted after deterministic diversity failure; the generation is rejected if the second set remains too similar.
 
@@ -95,43 +105,55 @@ Concept Artist
 
 21st is component/reference research, not architecture authority and not permission to force React/Tailwind into a target that does not use it.
 
-## Browser capability rule
+## Browser capability and SSRF rule
 
 A deployment can provide `WEB_DESIGN_AGENT_BROWSER_MCP_URL`. Otherwise it can opt into the official Playwright MCP stdio fallback with `WEB_DESIGN_AGENT_ENABLE_PLAYWRIGHT=true`.
 
 WDA uses native Strands `McpServerConfig` fields directly. Browser tool names remain canonical, such as `browser_navigate`; WDA does not add a redundant browser prefix.
 
-Durable/hosted environments should provision browsers once at environment bootstrap. WDA supports:
+Explicit browserable source inputs are validated before Strands sees them. Public-target validation requires HTTP(S), rejects URL credentials and non-public ports, resolves DNS, and fails closed on loopback, private, link-local, metadata, reserved, multicast, or mixed public/private DNS answers.
 
-- `WEB_DESIGN_AGENT_PLAYWRIGHT_EXECUTABLE_PATH`;
-- `WEB_DESIGN_AGENT_PLAYWRIGHT_BROWSERS_PATH` or `PLAYWRIGHT_BROWSERS_PATH`;
-- `WEB_DESIGN_AGENT_PLAYWRIGHT_MCP_COMMAND`.
+Application URL validation is not a complete SSRF boundary because redirects, DNS rebinding, browser clicks, and model-discovered destinations happen after request parsing. Therefore a public NoAuth HTTP deployment with browser capability must also run the browser in a network boundary that cannot reach Tavall/control/private/metadata networks. WDA refuses that public browser configuration unless the deployment explicitly declares the egress boundary is in place.
 
-Browser binaries are not downloaded per anonymous design request.
+Durable/hosted environments should provision browsers once at environment bootstrap. WDA supports an environment-owned browser executable/cache or remote browser MCP. Browser binaries are not downloaded per anonymous design request.
 
 ## Runtime evidence rule
 
-**Model-authored validation claims are never authoritative browser evidence.**
+**Model-authored validation claims are never authoritative browser or provider evidence.**
 
-Generation and refinement consume the native Strands stream. `WebDesignAgentToolEvidenceCollector` watches actual nested candidate lifecycle events surfaced through Strands agent-as-tool streaming.
+Generation and refinement consume the native Strands stream. `WebDesignAgentToolEvidenceCollector` watches nested specialist lifecycle events surfaced through Strands agent-as-tool streaming.
 
-Only successful candidate `browser_*` calls are recorded. Failed calls do not count.
+### Browser evidence
+
+A successful `browser_navigate` establishes the candidate's current inspected target. A failed later navigation clears it. `browser_snapshot` or `browser_take_screenshot` counts only when it follows a successful navigation and is therefore bound to a known target.
 
 For generation:
 
 - model-authored candidate `browserEvidence` is replaced;
 - model-authored `validation.browserValidated` is ignored;
-- model-authored validation notes are retained only as explicitly unverified agent notes;
-- `browserValidated=true` requires successful inspection evidence for **A, B, and C**;
-- successful inspection means an observed `browser_snapshot` or `browser_take_screenshot` call for that candidate.
+- failed browser calls do not count;
+- model-authored validation notes are retained only as explicitly unverified agent notes.
 
-For refinement, selected-candidate browser evidence is likewise replaced by observed Strands tool evidence.
+Source-dependent modes are strict:
 
-Existing-site/reference-image modes require both configured browser capability and observed successful inspection. Merely configuring a browser does not satisfy the contract.
+- `reference-image` requires `referenceImageUrl` and browser capability;
+- `existing-site` requires `targetUrl` and browser capability;
+- `concept-first` requires a selected concept and browser capability;
+- A, B, and C must each inspect the exact validated source target before the source-dependent generation can succeed.
+
+For code-first generation, observed browser activity is retained as runtime evidence, but `browserValidated` remains **false** until the final returned candidate implementation can be deterministically bound to a controlled render target. Inspecting an arbitrary public page does not validate the HTML returned by WDA.
+
+For refinement, selected-candidate browser evidence is likewise replaced by observed Strands tool evidence. Refinement also rejects a specialist result whose A/B/C ID does not match the selected candidate.
+
+### Component and concept-provider evidence
+
+Successful `components_*` calls are attributed to the candidate that used 21st/component research. Configuration alone is not evidence of use.
+
+Concept-first image exploration requires successful `assets_*` execution from the Concept Artist. Three plausible image URLs in model JSON without a real provider event are rejected.
 
 ### Why
 
-A model saying “I checked it” is not evidence that it checked it. The runtime already receives real Strands tool lifecycle events, so validation should be derived from those events rather than from prose-shaped optimism.
+A model saying “I checked it” or “I generated this image” is not evidence. The runtime already receives real Strands lifecycle events, so WDA derives product evidence from those events rather than from prose-shaped optimism.
 
 ## NoAuth public MCP rule
 
@@ -139,7 +161,11 @@ The hosted HTTP MCP endpoint is intentionally **NoAuth**.
 
 Clients do not create WDA accounts, log in, or send product bearer tokens. Deployment-owned model, browser, 21st, or image-provider credentials stay behind the service boundary.
 
-Rate limits, concurrency ceilings, request-size limits, timeouts, and compute/resource ceilings are abuse/capacity controls, not authentication.
+NoAuth does not mean unbounded. The public Node boundary enforces configurable per-process concurrency, body-size, request-receive, and header limits. Tool schemas additionally bound prompt, feedback, URL, page-count/path, candidate, preference, and design-system fields before expensive workflow execution.
+
+Native Strands wall-clock/turn/token budgets limit model/tool execution. MCP request cancellation propagates to Strands. Global or per-source rate limiting remains an edge/distributed-infrastructure responsibility rather than an application-owned mutable map.
+
+These are abuse/capacity controls, not authentication.
 
 ## Visual preference rule
 
@@ -162,9 +188,20 @@ prompt
 -> optional component/browser work
 -> Visual Critic
 -> typed parse
--> runtime-grounded browser evidence
+-> runtime evidence retained
+-> browserValidated=false until final output is render-bound
 -> deterministic diversity + route checks
 -> A/B/C result
+```
+
+### Existing-site / reference-image
+
+```text
+validated public source URL
+-> A/B/C each navigate and inspect exact source
+-> implementation + critique
+-> runtime verifies target-bound inspection
+-> reject if any candidate lacks source evidence
 ```
 
 ### Refinement
@@ -173,9 +210,10 @@ prompt
 selected candidate
 + VisualState
 + human feedback
--> matching Candidate agent
+-> matching Candidate agent only
 -> optional browser work
 -> Visual Critic
+-> enforce returned candidate ID
 -> observed evidence replaces model evidence
 -> refined candidate
 ```
@@ -184,89 +222,51 @@ selected candidate
 
 ```text
 prompt
--> optional Concept Artist + image capability
+-> Concept Artist + image capability
+-> observed assets_* provider execution
 -> three conceptual references
 -> user selects one
--> selected concept becomes design input
--> real A/B/C implementation flow
+-> validate selected public image URL
+-> A/B/C each inspect selected image
+-> real implementation flow
 ```
 
 Concept images are references, never proof of a working site.
 
 ## MCP product surface
 
-The product registers:
-
-- `design`;
-- `refine-design`;
-- `create-design-concepts`;
-- `design-from-concept`;
-- `export-design`;
-- `extract-design-system`;
-- `build-design-preference-profile`;
-- `web-design-capabilities`;
-- MCP App resource `ui://web-design-agent/abc-review.html`.
+The product registers `design`, `refine-design`, `create-design-concepts`, `design-from-concept`, `export-design`, `extract-design-system`, `build-design-preference-profile`, `web-design-capabilities`, and MCP App resource `ui://web-design-agent/abc-review.html`.
 
 The HTTP root advertises `authentication: none`.
 
 ## MCP App review surface
 
-The review UI supports:
-
-- A/B/C selection;
-- simultaneous comparison;
-- desktop/tablet/mobile widths;
-- multi-page route switching;
-- live visual sliders;
-- design-system inspection;
-- refinement;
-- selected-candidate context handoff;
-- export;
-- concept-first selection.
+The review UI supports A/B/C selection, simultaneous comparison, desktop/tablet/mobile widths, multi-page route switching, live visual sliders, design-system inspection, refinement, selected-candidate context handoff, export, and concept-first selection.
 
 Generated pages render inside sandboxed iframes. The review shell does not dictate the generated site's framework.
 
 ## Evaluation
 
-The checked-in vague-prompt corpus currently records objective metrics:
-
-- generation success;
-- valid three-candidate implementation rate;
-- deterministic diversity rate;
-- runtime-grounded browser validation rate.
+The checked-in vague-prompt corpus records objective metrics such as generation success, valid three-candidate implementation rate, deterministic diversity rate, and runtime-grounded browser validation rate.
 
 Subjective quality such as “a human would keep one of these” must come from real evaluation, not an invented automated score.
 
 ## Physical validation baseline
 
-Current real-package evidence includes:
+The last fully executed physical baseline predates the newest SSRF, request-budget, cancellation, bounded-schema, and source-binding commits. That earlier baseline proved real Node 22 installation, `@tjxjnoobie/strands-bridge`, Strands 1.16.0, 30/30 then-current product/delegate tests, HTTP MCP integration, production MCP App build, packed consumer startup, official AppBridge interaction, native Strands + Playwright MCP, real navigation/snapshot/PNG, and package dry-run.
 
-```text
-Node 22 install                                  PASS
-@tjxjnoobie/strands-bridge@0.1.0                 PASS
-@strands-agents/sdk@1.16.0                       PASS
-strict TypeScript                                PASS
-product/delegate tests                           PASS (30 / 30)
-real HTTP MCP integration                        PASS (1 / 1)
-production Vite MCP App build                    PASS
-clean packed-consumer install                    PASS
-packed NoAuth MCP + eight-tool negotiation       PASS
-official MCP Apps AppBridge browser smoke        PASS
-native Strands candidate + Playwright MCP init   PASS
-Playwright browser catalog                       PASS (24 tools)
-real navigate/snapshot/PNG                       PASS
-runtime-grounded evidence behavior               PASS
-package dry-run                                  PASS
-```
+Those results remain valid evidence for the tested commit only. They are **not** upgraded to physical evidence for the current source head until `npm run check:durable` is rerun.
 
 The repository exposes `npm run check:durable` for the durable reusable DEVELOPMENT environment. It combines the core physical gate, physical Strands/browser integration, and package dry-run.
 
 ## Remaining promotion gates
 
-- commit exact generated dependency locks from the durable DEVELOPMENT write surface;
+- rerun the current security-hardened head in the durable DEVELOPMENT environment and commit the exact generated dependency lock;
+- enforce and verify the public browser egress network boundary in deployment;
+- add deterministic final-candidate render binding for code-first browser validation;
 - run an authorized real model through Director -> A/B/C -> Critic;
 - run real 21st MCP through Strands with deployment-owned credentials;
-- prove the real model-led render -> inspect -> critique -> repair loop using the runtime evidence collector;
+- prove the real model-led render -> inspect -> critique -> repair loop using runtime evidence;
 - prove the Concept Artist southbound image-provider path through Strands;
 - render the production MCP App in supported ChatGPT and Claude clients;
 - run the full vague-prompt corpus with real model/browser behavior and record one-shot quality.
@@ -276,9 +276,12 @@ The repository exposes `npm run check:durable` for the durable reusable DEVELOPM
 - Strands owns the agent framework and model/tool loop.
 - `strands-bridge` is thin shared glue only.
 - The public HTTP MCP endpoint is NoAuth.
+- NoAuth browser access requires isolated network egress.
 - A/B/C means genuinely different real implementations.
-- Browser evidence comes from observed Strands tool execution, never model self-report.
+- Browser/provider evidence comes from observed Strands execution, never model self-report.
+- Source-dependent evidence must match the validated source target.
+- Code-first is not browser-validated until final output is deterministically render-bound.
 - External capabilities are role-scoped.
-- Browsers are environment-provisioned, not downloaded per request.
+- Native Strands limits and cancellation bound public agent work.
 - Concept imagery is reference material, not working-site evidence.
 - Public requests remain isolated and stateless.
