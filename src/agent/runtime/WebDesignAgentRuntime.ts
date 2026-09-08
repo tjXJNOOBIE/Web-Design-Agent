@@ -1,6 +1,10 @@
 import type {IStrandsAgentRuntime} from '@tjxjnoobie/strands-bridge'
 
-import type {WebDesignAgentCapabilityData} from '../config/WebDesignAgentRuntimeConfigBuilder.js'
+import {
+  DEFAULT_WEB_DESIGN_AGENT_INVOCATION_POLICY,
+  type WebDesignAgentCapabilityData,
+  type WebDesignAgentInvocationPolicyData,
+} from '../config/WebDesignAgentRuntimeConfigBuilder.js'
 import {WebDesignAgentToolEvidenceCollector} from '../evidence/WebDesignAgentToolEvidenceCollector.js'
 import type {IWebDesignAgentRuntime} from './IWebDesignAgentRuntime.js'
 import type {
@@ -31,6 +35,18 @@ type NormalizedDesignGenerationRequest = DesignGenerationRequest & {
   readonly sourceMode: NonNullable<DesignGenerationRequest['sourceMode']>
 }
 
+const FAILED_INVOCATION_STOP_REASONS = new Set([
+  'cancelled',
+  'limitTurns',
+  'limitTotalTokens',
+  'limitOutputTokens',
+  'maxTokens',
+  'modelContextWindowExceeded',
+  'contentFiltered',
+  'guardrailIntervened',
+  'refusal',
+])
+
 export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
   private closed = false
 
@@ -38,6 +54,8 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
     private readonly director: IStrandsAgentRuntime,
     private readonly owned: readonly IStrandsAgentRuntime[],
     private readonly capabilities: WebDesignAgentCapabilityData,
+    private readonly invocationPolicy: WebDesignAgentInvocationPolicyData =
+      DEFAULT_WEB_DESIGN_AGENT_INVOCATION_POLICY,
     private readonly browserTargets = new WebDesignAgentBrowserTargetValidator(),
     private readonly parser = new DesignGenerationResultParser(),
     private readonly distance = new DesignDistanceEvaluator(),
@@ -196,11 +214,28 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
     prompt: string,
   ): Promise<StreamedDirectorInvocationData> {
     const evidence = new WebDesignAgentToolEvidenceCollector()
-    const stream = this.director.streamAgent(prompt)
+    const stream = this.director.streamAgent(prompt, {
+      cancelSignal: AbortSignal.timeout(this.invocationPolicy.timeoutMs),
+      limits: {
+        turns: this.invocationPolicy.maxTurns,
+        outputTokens: this.invocationPolicy.maxOutputTokens,
+        totalTokens: this.invocationPolicy.maxTotalTokens,
+      },
+    })
 
     while (true) {
       const next = await stream.next()
       if (next.done) {
+        const stopReason = next.value.stopReason
+        if (
+          typeof stopReason === 'string' &&
+          FAILED_INVOCATION_STOP_REASONS.has(stopReason)
+        ) {
+          throw new DesignResultValidationError(
+            `Web Design Agent invocation stopped before a complete result was produced: ${stopReason}.`,
+          )
+        }
+
         return {
           text: next.value.toString(),
           evidence,
@@ -220,11 +255,17 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
       (candidate) => candidate.id,
     )
     const expectedBrowserTarget = this.expectedBrowserTarget(request)
+    const sourceBoundBrowserValidation = expectedBrowserTarget !== undefined
     const missingBrowserInspection = this.capabilities.browser
       ? evidence.missingBrowserInspection(candidateIds, expectedBrowserTarget)
       : candidateIds
+    const observedBrowserInspection =
+      this.capabilities.browser &&
+      evidence.missingBrowserInspection(candidateIds).length === 0
     const browserValidated =
-      this.capabilities.browser && missingBrowserInspection.length === 0
+      sourceBoundBrowserValidation &&
+      this.capabilities.browser &&
+      missingBrowserInspection.length === 0
     const candidates = result.candidates.map((candidate) => ({
       ...candidate,
       browserEvidence: this.capabilities.browser
@@ -241,9 +282,15 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
       )
     } else if (browserValidated) {
       notes.push(
-        expectedBrowserTarget === undefined
-          ? 'Runtime evidence: successful browser navigation-bound inspection was observed for candidates A, B, and C.'
-          : 'Runtime evidence: successful browser inspection of the required source target was observed for candidates A, B, and C.',
+        'Runtime evidence: successful browser inspection of the required source target was observed for candidates A, B, and C.',
+      )
+    } else if (!sourceBoundBrowserValidation && observedBrowserInspection) {
+      notes.push(
+        'Runtime evidence: browser activity was observed for candidates A, B, and C, but the final returned candidate implementations are not yet deterministically render-bound; browserValidated remains false.',
+      )
+    } else if (!sourceBoundBrowserValidation) {
+      notes.push(
+        'Runtime evidence: final returned candidate implementations are not yet deterministically render-bound, so code-first browserValidated remains false.',
       )
     } else {
       notes.push(
@@ -354,6 +401,9 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
   ): string | undefined {
     if (request.targetUrl !== undefined) return request.targetUrl
     if (request.sourceMode === 'reference-image') return request.referenceImageUrl
+    if (request.sourceMode === 'concept-first') {
+      return request.selectedConcept?.imageUrl
+    }
     return undefined
   }
 
@@ -379,7 +429,11 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
       )
     }
     if (request.selectedConcept) {
-      lines.push(`Selected concept: ${JSON.stringify(request.selectedConcept)}`)
+      lines.push(
+        `Selected concept: ${JSON.stringify(request.selectedConcept)}`,
+        `Selected concept image target: ${request.selectedConcept.imageUrl}`,
+        'Each candidate must navigate to and inspect this exact validated concept image target before claiming concept-grounded browser evidence.',
+      )
     }
     if (request.pages?.length) {
       lines.push(`Requested pages: ${JSON.stringify(request.pages)}`)
@@ -399,6 +453,7 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
     return (
       request.sourceMode === 'reference-image' ||
       request.sourceMode === 'existing-site' ||
+      request.sourceMode === 'concept-first' ||
       request.targetUrl !== undefined
     )
   }
