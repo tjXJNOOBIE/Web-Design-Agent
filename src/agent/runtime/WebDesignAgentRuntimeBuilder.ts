@@ -1,5 +1,90 @@
-import type {IStrandsAgentRuntime,IStrandsAgentRuntimeBootstrap} from '@tjxjnoobie/strands-bridge'
+import type {
+  IStrandsAgentRuntime,
+  IStrandsAgentRuntimeBootstrap,
+} from '@tjxjnoobie/strands-bridge'
+
 import type {IWebDesignAgentRuntime} from './IWebDesignAgentRuntime.js'
 import {WebDesignAgentRuntime} from './WebDesignAgentRuntime.js'
 import {WebDesignAgentRuntimeConfigBuilder} from '../config/WebDesignAgentRuntimeConfigBuilder.js'
-export class WebDesignAgentRuntimeBuilder{public constructor(private readonly bootstrap:IStrandsAgentRuntimeBootstrap,private readonly config:WebDesignAgentRuntimeConfigBuilder){}public async build():Promise<IWebDesignAgentRuntime>{const created:IStrandsAgentRuntime[]=[];try{const a=await this.create(this.config.buildCandidate('A'),created),b=await this.create(this.config.buildCandidate('B'),created),c=await this.create(this.config.buildCandidate('C'),created),critic=await this.create(this.config.buildCritic(),created);const tools=[a.createAgentTool({name:'candidate_a',description:'Build/refine candidate A.'}),b.createAgentTool({name:'candidate_b',description:'Build/refine candidate B.'}),c.createAgentTool({name:'candidate_c',description:'Build/refine candidate C.'}),critic.createAgentTool({name:'visual_critic',description:'Critique candidate evidence without implementing.'})];if(this.config.capabilities().conceptImages){const concept=await this.create(this.config.buildConcept(),created);tools.push(concept.createAgentTool({name:'concept_artist',description:'Generate real concept images.'}))}const director=await this.create(this.config.buildDirector(tools),created);return new WebDesignAgentRuntime(director,[...created].reverse(),this.config.capabilities())}catch(startupError){const errors:unknown[]=[];for(const runtime of [...created].reverse())try{await runtime.close()}catch(error){errors.push(error)}if(errors.length)throw new AggregateError([startupError,...errors],'Web Design Agent startup and cleanup both failed.');throw startupError}}private async create(config:Parameters<IStrandsAgentRuntimeBootstrap['createAgentRuntime']>[0],created:IStrandsAgentRuntime[]):Promise<IStrandsAgentRuntime>{const runtime=await this.bootstrap.createAgentRuntime(config);created.push(runtime);return runtime}}
+
+export class WebDesignAgentRuntimeBuilder {
+  public constructor(
+    private readonly bootstrap: IStrandsAgentRuntimeBootstrap,
+    private readonly config: WebDesignAgentRuntimeConfigBuilder,
+  ) {}
+
+  public async build(): Promise<IWebDesignAgentRuntime> {
+    const created: IStrandsAgentRuntime[] = []
+
+    try {
+      const candidateA = await this.create(this.config.buildCandidate('A'), created)
+      const candidateB = await this.create(this.config.buildCandidate('B'), created)
+      const candidateC = await this.create(this.config.buildCandidate('C'), created)
+      const critic = await this.create(this.config.buildCritic(), created)
+      const tools = [
+        candidateA.createAgentTool({
+          name: 'candidate_a',
+          description: 'Build/refine candidate A.',
+        }),
+        candidateB.createAgentTool({
+          name: 'candidate_b',
+          description: 'Build/refine candidate B.',
+        }),
+        candidateC.createAgentTool({
+          name: 'candidate_c',
+          description: 'Build/refine candidate C.',
+        }),
+        critic.createAgentTool({
+          name: 'visual_critic',
+          description: 'Critique candidate evidence without implementing.',
+        }),
+      ]
+
+      if (this.config.capabilities().conceptImages) {
+        const concept = await this.create(this.config.buildConcept(), created)
+        tools.push(
+          concept.createAgentTool({
+            name: 'concept_artist',
+            description: 'Generate real concept images.',
+          }),
+        )
+      }
+
+      const director = await this.create(this.config.buildDirector(tools), created)
+      return new WebDesignAgentRuntime(
+        director,
+        [...created].reverse(),
+        this.config.capabilities(),
+        this.config.invocationPolicy(),
+      )
+    } catch (startupError) {
+      const errors: unknown[] = []
+      for (const runtime of [...created].reverse()) {
+        try {
+          await runtime.close()
+        } catch (error) {
+          errors.push(error)
+        }
+      }
+
+      if (errors.length > 0) {
+        throw new AggregateError(
+          [startupError, ...errors],
+          'Web Design Agent startup and cleanup both failed.',
+          {cause: startupError},
+        )
+      }
+
+      throw startupError
+    }
+  }
+
+  private async create(
+    config: Parameters<IStrandsAgentRuntimeBootstrap['createAgentRuntime']>[0],
+    created: IStrandsAgentRuntime[],
+  ): Promise<IStrandsAgentRuntime> {
+    const runtime = await this.bootstrap.createAgentRuntime(config)
+    created.push(runtime)
+    return runtime
+  }
+}
