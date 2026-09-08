@@ -64,7 +64,7 @@ export class WebDesignAgentRuntimeConfigBuilder {
     return {
       components: this.optionalString(this.environment['API_KEY_21ST']) !== undefined,
       browser: browserUrl !== undefined || localPlaywright,
-      finalCandidatePreview: localPlaywright,
+      ...(localPlaywright ? {finalCandidatePreview: true} : {}),
       conceptImages: this.optionalBoolean(
         this.environment['WEB_DESIGN_AGENT_ENABLE_HIGGSFIELD'],
       ),
@@ -118,7 +118,6 @@ export class WebDesignAgentRuntimeConfigBuilder {
     return this.buildRuntime(
       'web-design-agent-critic',
       'Web Design Agent Visual Critic',
-      WEB_DESIGN_AGENT_CRITIC_SYSTEM_PROMPT,
       [],
       {components: false, browser: false, conceptImages: false},
     )
