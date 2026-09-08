@@ -84,3 +84,21 @@ test('configures concept image MCP with a native assets prefix', () => {
     Authorization: 'Bearer test-token',
   })
 })
+
+test('scopes external MCP tools to the Strands agents that own them', () => {
+  const builder = new WebDesignAgentRuntimeConfigBuilder({
+    API_KEY_21ST: 'test-key',
+    WEB_DESIGN_AGENT_ENABLE_PLAYWRIGHT: 'true',
+    WEB_DESIGN_AGENT_ENABLE_HIGGSFIELD: 'true',
+    WEB_DESIGN_AGENT_HIGGSFIELD_MCP_AUTHORIZATION: 'Bearer test-token',
+  })
+
+  assert.equal(builder.buildDirector().mcpServers, undefined)
+  assert.equal(builder.buildCritic().mcpServers, undefined)
+
+  const candidateServers = serversFor(builder)
+  assert.deepEqual(Object.keys(candidateServers).sort(), ['browser', 'components'])
+
+  const conceptServers = serversFor(builder, 'concept')
+  assert.deepEqual(Object.keys(conceptServers), ['higgsfield'])
+})
