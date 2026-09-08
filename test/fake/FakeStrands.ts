@@ -6,9 +6,11 @@ import type {
 
 export class FakeRuntime implements IStrandsAgentRuntime {
   public invokes: string[] = []
+  public streamOptions: unknown[] = []
   public closeCalls = 0
   public results: string[] = []
   public streamEvents: unknown[][] = []
+  public stopReason: string = 'endTurn'
   private closed = false
 
   public constructor(result = '{}') {
@@ -17,24 +19,34 @@ export class FakeRuntime implements IStrandsAgentRuntime {
 
   public async invokeAgent(args: any): Promise<any> {
     this.invokes.push(String(args))
-    return { toString: () => this.results.shift() ?? '{}' }
+    return {
+      stopReason: this.stopReason,
+      toString: () => this.results.shift() ?? '{}',
+    }
   }
 
-  public async *streamAgent(args: any): AsyncGenerator<any, any, undefined> {
+  public async *streamAgent(
+    args: any,
+    options?: any,
+  ): AsyncGenerator<any, any, undefined> {
     this.invokes.push(String(args))
+    this.streamOptions.push(options)
     const events = this.streamEvents.shift() ?? []
 
     for (const event of events) {
       yield event
     }
 
-    return { toString: () => this.results.shift() ?? '{}' }
+    return {
+      stopReason: this.stopReason,
+      toString: () => this.results.shift() ?? '{}',
+    }
   }
 
   public cancelInvocation(): void {}
 
-  public createAgentTool(options?: { name?: string }): any {
-    return { name: options?.name }
+  public createAgentTool(options?: {name?: string}): any {
+    return {name: options?.name}
   }
 
   public isClosed(): boolean {
