@@ -8,6 +8,7 @@ import {
 import type {Transport} from '@modelcontextprotocol/sdk/shared/transport.js'
 import {StreamableHTTPServerTransport} from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 
+import type {WebDesignAgentPreviewRuntime} from '../../design/preview/WebDesignAgentPreviewRuntime.js'
 import type {WebDesignMcpServerBuilder} from '../server/WebDesignMcpServerBuilder.js'
 
 const DEFAULT_MAX_CONCURRENT_REQUESTS = 4
@@ -45,6 +46,7 @@ export class WebDesignMcpHttpServer {
     private readonly host = '0.0.0.0',
     private readonly port = 3001,
     limits: WebDesignMcpHttpServerLimits = {},
+    private readonly previewRuntime?: WebDesignAgentPreviewRuntime,
   ) {
     this.maxConcurrentRequests = this.positiveInteger(
       limits.maxConcurrentRequests ?? DEFAULT_MAX_CONCURRENT_REQUESTS,
@@ -91,18 +93,22 @@ export class WebDesignMcpHttpServer {
     const current = this.server
     this.server = undefined
 
-    if (current === undefined) return
+    try {
+      if (current !== undefined) {
+        await new Promise<void>((resolve, reject) => {
+          current.close((error) => {
+            if (error !== undefined) {
+              reject(error)
+              return
+            }
 
-    await new Promise<void>((resolve, reject) => {
-      current.close((error) => {
-        if (error !== undefined) {
-          reject(error)
-          return
-        }
-
-        resolve()
-      })
-    })
+            resolve()
+          })
+        })
+      }
+    } finally {
+      this.previewRuntime?.close()
+    }
   }
 
   private async handleRequest(
@@ -121,6 +127,11 @@ export class WebDesignMcpHttpServer {
       request.url ?? '/',
       `http://${request.headers.host ?? 'localhost'}`,
     )
+
+    if (url.pathname.startsWith('/preview/')) {
+      this.handlePreviewRequest(request, response, url.pathname)
+      return
+    }
 
     if (url.pathname === '/') {
       response.setHeader('content-type', 'application/json')
@@ -165,6 +176,38 @@ export class WebDesignMcpHttpServer {
     } finally {
       this.activeMcpRequests -= 1
     }
+  }
+
+  private handlePreviewRequest(
+    request: IncomingMessage,
+    response: ServerResponse,
+    path: string,
+  ): void {
+    if (request.method !== 'GET') {
+      response.statusCode = 405
+      response.setHeader('allow', 'GET')
+      response.end('Method not allowed')
+      return
+    }
+
+    const preview = this.previewRuntime?.read(path)
+    if (preview === undefined) {
+      response.statusCode = 404
+      response.end('Not found')
+      return
+    }
+
+    response.statusCode = 200
+    response.setHeader('content-type', 'text/html; charset=utf-8')
+    response.setHeader('cache-control', 'no-store')
+    response.setHeader('content-security-policy', preview.contentSecurityPolicy)
+    response.setHeader(
+      'permissions-policy',
+      'accelerometer=(), camera=(), geolocation=(), gyroscope=(), microphone=(), payment=(), usb=()',
+    )
+    response.setHeader('referrer-policy', 'no-referrer')
+    response.setHeader('x-content-type-options', 'nosniff')
+    response.end(preview.html)
   }
 
   private async handleMcpRequest(
@@ -332,7 +375,7 @@ export class WebDesignMcpHttpServer {
         'mcp-session-id',
       ].join(','),
     )
-    response.setHeader('access-control-allow-methods', 'POST,OPTIONS')
+    response.setHeader('access-control-allow-methods', 'GET,POST,OPTIONS')
     response.setHeader('access-control-expose-headers', 'mcp-session-id')
   }
 
