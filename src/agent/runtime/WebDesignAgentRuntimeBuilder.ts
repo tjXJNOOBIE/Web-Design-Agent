@@ -3,15 +3,38 @@ import type {
   IStrandsAgentRuntimeBootstrap,
 } from '@tjxjnoobie/strands-bridge'
 
+import type {
+  WebDesignAgentCapabilityData,
+} from '../config/WebDesignAgentRuntimeConfigBuilder.js'
+import {WebDesignAgentRuntimeConfigBuilder} from '../config/WebDesignAgentRuntimeConfigBuilder.js'
+import type {WebDesignAgentPreviewRuntime} from '../../design/preview/WebDesignAgentPreviewRuntime.js'
 import type {IWebDesignAgentRuntime} from './IWebDesignAgentRuntime.js'
 import {WebDesignAgentRuntime} from './WebDesignAgentRuntime.js'
-import {WebDesignAgentRuntimeConfigBuilder} from '../config/WebDesignAgentRuntimeConfigBuilder.js'
 
 export class WebDesignAgentRuntimeBuilder {
   public constructor(
     private readonly bootstrap: IStrandsAgentRuntimeBootstrap,
     private readonly config: WebDesignAgentRuntimeConfigBuilder,
+    private readonly previewRuntime?: WebDesignAgentPreviewRuntime,
+    private readonly previewBaseUrl?: string,
   ) {}
+
+  public capabilities(): WebDesignAgentCapabilityData {
+    const configured = this.config.capabilities()
+    const {
+      finalCandidatePreview: _configuredPreviewCapability,
+      ...baseCapabilities
+    } = configured
+    const finalCandidatePreview =
+      baseCapabilities.browser &&
+      this.previewRuntime !== undefined &&
+      this.previewBaseUrl !== undefined
+
+    return {
+      ...baseCapabilities,
+      ...(finalCandidatePreview ? {finalCandidatePreview: true} : {}),
+    }
+  }
 
   public async build(): Promise<IWebDesignAgentRuntime> {
     const created: IStrandsAgentRuntime[] = []
@@ -54,8 +77,13 @@ export class WebDesignAgentRuntimeBuilder {
       return new WebDesignAgentRuntime(
         director,
         [...created].reverse(),
-        this.config.capabilities(),
+        this.capabilities(),
         this.config.invocationPolicy(),
+        undefined,
+        undefined,
+        undefined,
+        this.previewRuntime,
+        this.previewBaseUrl,
       )
     } catch (startupError) {
       const errors: unknown[] = []
