@@ -2,6 +2,7 @@ import {lookup} from 'node:dns/promises'
 import {BlockList, isIP} from 'node:net'
 
 import {DesignResultValidationError} from './DesignResultValidationError.js'
+import {WEB_DESIGN_AGENT_REQUEST_LIMITS} from './WebDesignAgentRequestLimits.js'
 
 export type WebDesignAgentDnsResolver = (
   hostname: string,
@@ -71,6 +72,11 @@ export class WebDesignAgentBrowserTargetValidator {
     const normalizedValue = value.trim()
     if (normalizedValue.length === 0) {
       throw new DesignResultValidationError(`${label} must be non-blank.`)
+    }
+    if (normalizedValue.length > WEB_DESIGN_AGENT_REQUEST_LIMITS.urlCharacters) {
+      throw new DesignResultValidationError(
+        `${label} exceeds the ${WEB_DESIGN_AGENT_REQUEST_LIMITS.urlCharacters}-character URL limit.`,
+      )
     }
 
     let url: URL
