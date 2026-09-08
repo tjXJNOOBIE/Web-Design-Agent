@@ -3,7 +3,7 @@
 > **Status:** Working product and architecture contract  
 > **Authority:** Proposed Web Design Agent product behavior still open to material design changes  
 > **Owns:** Web design workflow, product prompts, typed design contracts, product MCP surface, MCP App review experience, external design-tool selection, and product validation policy  
-> **Must not define:** Shared Strands SDK lifecycle/MCP mechanics, Tavall Java infrastructure, target-project frontend architecture, or claims unsupported by runtime evidence
+> **Must not define:** Shared Strands SDK lifecycle/MCP mechanics, Tavall Java infrastructure, target-project frontend architecture, provider implementations, client authentication requirements, or claims unsupported by runtime evidence
 
 ## About
 
@@ -18,19 +18,19 @@ This repository owns:
 - the Design Director, candidate, critic, and optional concept-specialist product prompts;
 - A/B/C product policy and deterministic diversity enforcement;
 - design intent, Design Genome, design system, visual state, multi-page, concept, export, and preference-profile contracts;
-- the stateless public MCP product surface and local stdio surface;
+- the stateless public NoAuth MCP product surface and local stdio surface;
 - the MCP App review/editor experience;
 - selection of optional browser, component-research, and concept-image MCP integrations;
 - one-shot evaluation metrics and product validation requirements.
 
-`@tjxjnoobie/custom-strands-bridge` owns:
+Strands is the agent framework and owns the model/tool loop. The thin `@tjxjnoobie/strands-bridge` package owns only shared integration mechanics that multiple products would otherwise duplicate:
 
 - physical Strands SDK construction;
 - native Strands MCP loading;
 - native agent-as-tool composition support;
-- invocation, streaming, cancellation, and reverse-order MCP cleanup mechanics.
+- lifecycle validation and cleanup around invocation, streaming, cancellation, and reverse-order MCP teardown.
 
-The product must not create a second agent framework or duplicate Tavall Java DI/cache/registry/database/concurrency systems.
+The bridge must not become a second agent framework, provider layer, product authentication system, or mirror of native Strands capabilities. The product must not duplicate Tavall Java DI/cache/registry/database/concurrency systems.
 
 ## System Rules and Behavior
 
@@ -74,6 +74,20 @@ Browser evidence is truthful only when browser tooling actually executed. Existi
 
 Higgsfield concept-first generation is optional. Generated imagery is labeled and treated as conceptual reference. The selected concept must still be turned into real A/B/C implementations before it represents working product behavior.
 
+Provider keys, OAuth state, or other credentials required by optional model/design services are deployment-owned service capabilities. They are not credentials that a client must supply to use the Web Design Agent MCP endpoint.
+
+### NoAuth Public MCP Rule
+
+The hosted HTTP MCP product endpoint is NoAuth.
+
+Clients do not create Web Design Agent accounts, log in, or send product bearer tokens. Every public request receives an isolated runtime composition and no cross-client model/session state is shared.
+
+Deployment may enforce rate limits, concurrency limits, request-size limits, timeouts, and compute/resource ceilings. Those are abuse and capacity controls, not authentication.
+
+##### Why
+
+The product designs web pages. Requiring an account boundary for ordinary MCP use would add state, credential handling, and client friction without improving the core product contract. Provider-side secrets still remain private to the deployment that pays for or operates those capabilities.
+
 ### Visual Preference Rule
 
 Candidates expose review variables for density, spacing, radius, font scale, hero scale, contrast, depth, and motion where meaningful.
@@ -86,7 +100,7 @@ A selected design can produce a versioned portable preference profile containing
 
 ##### Why
 
-Portable explicit preference evidence allows future calls to reuse design taste without introducing cross-user state into a public no-auth service.
+Portable explicit preference evidence allows future calls to reuse design taste without introducing cross-user state into a public NoAuth service.
 
 ## Technical Structure
 
@@ -113,18 +127,18 @@ src/
 ### Runtime Composition
 
 ```text
-build Candidate A runtime
--> build Candidate B runtime
--> build Candidate C runtime
--> build Visual Critic runtime
--> optionally build Concept Artist runtime
--> expose specialists as native Strands agent tools
--> build Design Director runtime with those tools
+build Candidate A native Strands agent
+-> build Candidate B native Strands agent
+-> build Candidate C native Strands agent
+-> build Visual Critic native Strands agent
+-> optionally build Concept Artist native Strands agent
+-> expose specialists through native Strands agent-as-tool support
+-> build Design Director native Strands agent with those tools
 -> invoke product workflow
--> close Director and specialists in reverse construction order
+-> close lifecycle-owned agents/resources in reverse construction order
 ```
 
-Every public workflow call builds a fresh runtime composition. The public HTTP MCP endpoint therefore remains stateless across requests.
+Every public workflow call builds a fresh composition. The public HTTP MCP endpoint therefore remains stateless across requests.
 
 ## Runtime Flows
 
@@ -156,12 +170,14 @@ selected candidate
 
 ```text
 prompt
--> optional Concept Artist + Higgsfield MCP
+-> optional Concept Artist + deployment-provided image capability
 -> three conceptual images
 -> user selects one
 -> selected concept becomes reference input
 -> normal real A/B/C implementation flow
 ```
+
+Higgsfield is one supported provider path for this optional capability. Its provider authorization is deployment-owned and does not change the Web Design Agent's NoAuth client surface.
 
 ### Existing Site / Reference Image
 
@@ -185,7 +201,7 @@ The product registers:
 - `web-design-capabilities`;
 - MCP App resource `ui://web-design-agent/abc-review.html`.
 
-The HTTP surface exposes `/mcp` without product authentication and creates a fresh MCP server/transport for each request. Deployment must still apply ordinary network abuse controls such as rate limiting and resource limits.
+The HTTP surface exposes `/mcp` as a NoAuth product endpoint and creates a fresh MCP server/transport for each request. Clients do not log in or supply product credentials. Deployment-owned model or optional provider credentials are internal service capabilities, not client authentication. Deployment must still apply ordinary network abuse controls such as rate limiting, concurrency limits, request-size limits, timeouts, and resource limits.
 
 ## MCP App Review Surface
 
@@ -219,7 +235,7 @@ The suite does not fabricate subjective metrics such as "user would choose one" 
 
 The current PR line now has physical infrastructure evidence in addition to its contract tests.
 
-Verified on Node `v22.23.2` with real installed packages:
+Verified on Node `v22.23.2` with real installed packages before the package namespace reconciliation:
 
 - clean `npm install` succeeds;
 - strict TypeScript typecheck succeeds;
@@ -228,29 +244,31 @@ Verified on Node `v22.23.2` with real installed packages:
 - `npm pack` succeeds;
 - real MCP SDK 1.30 client negotiates the HTTP server, lists all eight tools, reads the production MCP App resource, and calls a real tool;
 - a clean external npm consumer installs the packed artifact, imports the public package, starts the MCP binary, and negotiates all eight tools;
-- the exact shared bridge commit physically verifies real `@strands-agents/sdk@1.16.0` and passes a native disposable Strands + MCP integration flow;
+- the shared bridge physically verifies real `@strands-agents/sdk@1.16.0` and passes a native disposable Strands + MCP integration flow;
 - the production MCP App completes the official MCP Apps `AppBridge` initialization flow in Chromium and passes A/B/C selection, route switching, live slider mutation, compare mode, and `ui/update-model-context` handoff;
 - one real Higgsfield website-concept generation completes through the connected external generation surface.
 
-The clean install also generates npm lockfile v3 reproducibly. It must be committed directly from the normal DEVELOPMENT environment rather than hand-reassembled from tool output.
+The renamed `@tjxjnoobie/strands-bridge` package and WDA dependency/import reconciliation must receive the same clean Node 22 install/check before that namespace change is considered physically revalidated.
 
 Before this draft may be promoted, the remaining product-quality paths must be verified:
 
-- commit the generated npm lockfile from the DEVELOPMENT environment;
+- commit the generated npm lockfile from the normal DEVELOPMENT environment when available;
+- rerun clean Node 22 install and `check:real` against the renamed bridge package/commit;
 - run an authorized real model generation through the Design Director and candidate specialists;
-- run authenticated 21st MCP discovery/use through the configured Strands runtime;
+- run real 21st MCP discovery/use through Strands with the deployment-owned API key;
 - run the configured southbound browser MCP through a real candidate render/critique/repair loop;
-- run the configured southbound Higgsfield MCP/OAuth concept-first path through Strands;
+- run the configured southbound Higgsfield concept-first path through Strands with deployment-owned provider authorization;
 - render the production MCP App in supported ChatGPT and Claude clients;
 - record exact one-shot evaluation results from real model/browser runs.
 
 ##### Why
 
-Infrastructure validation proves the package, Strands boundary, transport, App protocol, browser shell, and packaging behave physically. It does not prove the product's defining quality claim: that a vague prompt produces strong, distinctive sites through the complete authenticated model and design-tool loop. Promotion therefore remains tied to that evidence rather than to dependency plumbing alone.
+Infrastructure validation proves the package, Strands boundary, transport, App protocol, browser shell, and packaging behave physically. It does not prove the product's defining quality claim: that a vague prompt produces strong, distinctive sites through the complete provider-backed model and design-tool loop. Promotion therefore remains tied to that evidence rather than to dependency plumbing alone.
 
 ## Final Rules Summary
 
-- Strands owns the model/tool loop through the shared bridge.
+- Strands owns the agent framework and model/tool loop; `strands-bridge` owns only shared lifecycle/composition glue.
+- The public HTTP MCP endpoint is NoAuth.
 - A/B/C means structurally different real implementations.
 - Deterministic code validates candidate diversity and required pages.
 - External component libraries inspire design but do not force framework migration.
