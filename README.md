@@ -22,31 +22,31 @@ vague request
 - CLI generation through `web-design-agent`.
 - One-shot vague-prompt evaluation through `web-design-agent-eval`.
 
-The HTTP server intentionally does not require product authentication. Each MCP request constructs an isolated Web Design Agent runtime so anonymous clients do not share model/session state.
+The public HTTP MCP surface is intentionally **NoAuth**. Clients do not log in and do not supply Web Design Agent credentials. Each request constructs an isolated Web Design Agent runtime so anonymous clients do not share model/session state. Deployment-owned model keys or optional provider credentials are internal service capabilities, not client authentication requirements. Rate limiting, concurrency ceilings, request-size limits, and compute/resource limits are abuse controls, not auth.
 
 ## Strands architecture
 
-The product consumes Strands only through `@tjxjnoobie/custom-strands-bridge`.
+Strands is the agent framework and owns the model/tool loop. The product consumes the validated Strands baseline through the thin `@tjxjnoobie/strands-bridge` integration package; the bridge does not replace Strands or implement a second agent framework.
 
 ```text
 MCP / CLI request
   -> WebDesignAgentWorkflowHandler
   -> WebDesignAgentRuntimeBuilder
-     -> Candidate A Strands runtime
-     -> Candidate B Strands runtime
-     -> Candidate C Strands runtime
-     -> Visual Critic Strands runtime
-     -> optional Concept Artist Strands runtime
-     -> Design Director Strands runtime
-          with specialists exposed as native agent tools
+     -> Candidate A native Strands agent
+     -> Candidate B native Strands agent
+     -> Candidate C native Strands agent
+     -> Visual Critic native Strands agent
+     -> optional Concept Artist native Strands agent
+     -> Design Director native Strands agent
+          with specialists exposed through native Strands agent-as-tool support
   -> deterministic A/B/C validation
   -> typed result
-  -> reverse-order runtime close
+  -> reverse-order lifecycle close
 ```
 
 The Design Director owns the main model/tool loop. Candidate specialists own implementation directions. The critic evaluates output without becoming a fourth implementation style. Optional concept-first generation is isolated behind its own specialist and external capability.
 
-The shared bridge has been physically validated against real `@strands-agents/sdk@1.16.0`, including native agent construction and a disposable real Strands + MCP integration flow.
+The thin bridge has been physically validated against real `@strands-agents/sdk@1.16.0`, including native agent construction and a disposable real Strands + MCP integration flow.
 
 ## A/B/C contract
 
@@ -84,17 +84,17 @@ The production MCP App has been built as one 438.66 kB HTML resource and browser
 
 ## External design tools
 
-External capabilities are optional and environment-owned:
+External capabilities are optional and deployment-owned:
 
 | Capability | Configuration | Behavior |
 | --- | --- | --- |
 | 21st component research | `API_KEY_21ST` | Adds `https://21st.dev/api/mcp` by default. Results are design inspiration; they do not force React/Tailwind into the target stack. |
 | Browser/render evidence | `WEB_DESIGN_AGENT_BROWSER_MCP_URL` | Enables truthful browser/reference/existing-site inspection. Reference and existing-site modes reject when this capability is absent. |
-| Higgsfield concept-first | `WEB_DESIGN_AGENT_ENABLE_HIGGSFIELD=true` | Adds `https://mcp.higgsfield.ai/mcp` by default to the concept specialist. Authorization remains environment-owned. Concept images are references, not implementation evidence. |
+| Higgsfield concept-first | `WEB_DESIGN_AGENT_ENABLE_HIGGSFIELD=true` | Adds `https://mcp.higgsfield.ai/mcp` by default to the concept specialist. Provider authorization remains deployment-owned. Concept images are references, not implementation evidence. |
 
-Optional endpoint/auth overrides are available through the matching `WEB_DESIGN_AGENT_*` environment variables in `WebDesignAgentRuntimeConfigBuilder`.
+Optional endpoint/provider overrides are available through the matching `WEB_DESIGN_AGENT_*` environment variables in `WebDesignAgentRuntimeConfigBuilder`.
 
-A real Higgsfield concept image has been generated through the connected external surface. The Web Design Agent's own southbound Higgsfield MCP/OAuth path through Strands remains an authenticated integration gate.
+A real Higgsfield concept image has been generated through the connected external surface. The Web Design Agent's own southbound Higgsfield MCP path through Strands remains a provider-credential integration gate. That does not change the NoAuth client contract of the Web Design Agent MCP endpoint.
 
 ## Run
 
@@ -150,9 +150,9 @@ The following remain promotion gates:
 
 - commit the reproducibly generated npm lockfile from the normal DEVELOPMENT environment;
 - authorized real Web Design Agent model generation;
-- authenticated 21st MCP use through the Strands runtime;
+- real 21st MCP use through Strands with the deployment-owned API key;
 - real southbound browser MCP render/critique/repair execution through the agent;
-- real southbound Higgsfield MCP/OAuth concept-first execution through the agent;
+- real southbound Higgsfield MCP concept-first execution through the agent with deployment-owned provider credentials;
 - hosted ChatGPT and Claude MCP App rendering;
 - real vague-prompt one-shot quality measurements.
 
