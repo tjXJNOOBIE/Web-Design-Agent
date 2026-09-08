@@ -17,6 +17,7 @@ import type {DesignGenerationResult} from '../../design/data/DesignGenerationRes
 import type {DesignRefinementRequest} from '../../design/data/DesignRefinementRequest.js'
 import {
   type DesignCandidatePreviewTargetData,
+  type WebDesignAgentPreviewPublication,
   WebDesignAgentPreviewRuntime,
 } from '../../design/preview/WebDesignAgentPreviewRuntime.js'
 import {DesignDistanceEvaluator} from '../../design/validation/DesignDistanceEvaluator.js'
@@ -60,7 +61,7 @@ const FAILED_INVOCATION_STOP_REASONS = new Set([
 
 export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
   private closed = false
-  private previewRuntime?: WebDesignAgentPreviewRuntime
+  private previewPublication?: WebDesignAgentPreviewPublication
 
   public constructor(
     private readonly director: IStrandsAgentRuntime,
@@ -71,6 +72,8 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
     private readonly browserTargets = new WebDesignAgentBrowserTargetValidator(),
     private readonly parser = new DesignGenerationResultParser(),
     private readonly distance = new DesignDistanceEvaluator(),
+    private readonly previewRuntime?: WebDesignAgentPreviewRuntime,
+    private readonly previewBaseUrl?: string,
   ) {}
 
   public async generate(
@@ -217,14 +220,12 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
       }
     }
 
-    const previewRuntime = this.previewRuntime
-    this.previewRuntime = undefined
-    if (previewRuntime !== undefined) {
-      try {
-        await previewRuntime.close()
-      } catch (error) {
-        errors.push(error)
-      }
+    try {
+      this.previewPublication?.close()
+    } catch (error) {
+      errors.push(error)
+    } finally {
+      this.previewPublication = undefined
     }
 
     if (errors.length > 0) {
@@ -260,14 +261,20 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
       request.sourceMode !== 'code-first' ||
       this.expectedBrowserTarget(request) !== undefined ||
       !this.capabilities.browser ||
-      this.capabilities.finalCandidatePreview !== true
+      this.capabilities.finalCandidatePreview !== true ||
+      this.previewRuntime === undefined ||
+      this.previewBaseUrl === undefined
     ) {
       return undefined
     }
 
-    const previewRuntime =
-      this.previewRuntime ?? (this.previewRuntime = new WebDesignAgentPreviewRuntime())
-    const targets = await previewRuntime.publish(candidates)
+    this.previewPublication?.close()
+    const publication = this.previewRuntime.publish(
+      candidates,
+      this.previewBaseUrl,
+    )
+    this.previewPublication = publication
+    const targets = publication.targets
     const lines = [
       'OPERATION: inspect-final-code-first-previews',
       'The runtime has already parsed and frozen the exact final candidate artifacts.',
@@ -284,10 +291,10 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
     }
 
     lines.push('Return JSON only: {"inspected":["A","B","C"]}.')
-    const invocation = await this.streamDirector(lines.join('\n'), cancelSignal)
+    const inspection = await this.streamDirector(lines.join('\n'), cancelSignal)
 
     return {
-      evidence: invocation.evidence,
+      evidence: inspection.evidence,
       targets,
     }
   }
@@ -399,23 +406,23 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
       )
     } else if (finalPreviewValidated) {
       notes.push(
-        'Runtime evidence: the exact final A/B/C artifacts were published to content-addressed runtime previews and successfully inspected with browser tooling.',
+        'Runtime evidence: the exact final A/B/C artifacts were render-bound to content-addressed public previews and successfully inspected with browser tooling.',
       )
     } else if (finalPreviewInspection !== undefined) {
       notes.push(
-        `Runtime evidence: final content-addressed preview inspection was not observed for candidates ${missingFinalPreviewInspection.join(', ')}; browserValidated remains false.`,
+        `Runtime evidence: final render-bound content-addressed preview inspection was not observed for candidates ${missingFinalPreviewInspection.join(', ')}; browserValidated remains false.`,
       )
     } else if (observedBrowserInspection) {
       notes.push(
-        'Runtime evidence: browser activity was observed for candidates A, B, and C, but the final returned candidate implementations were not content-addressed and inspected; browserValidated remains false.',
+        'Runtime evidence: browser activity was observed for candidates A, B, and C, but the final returned candidate implementations were not render-bound to content-addressed previews; browserValidated remains false.',
       )
     } else if (this.capabilities.finalCandidatePreview !== true) {
       notes.push(
-        'Runtime evidence: this browser configuration cannot reach WDA\'s generation-owned loopback preview, so code-first final-artifact binding was not executed and browserValidated remains false.',
+        'Runtime evidence: final candidate preview publication is unavailable, so code-first output is not render-bound and browserValidated remains false.',
       )
     } else {
       notes.push(
-        'Runtime evidence: final returned candidate implementations were not successfully content-addressed and inspected, so code-first browserValidated remains false.',
+        'Runtime evidence: final returned candidate implementations were not successfully render-bound and inspected, so code-first browserValidated remains false.',
       )
     }
 
