@@ -70,3 +70,22 @@ test('workflow aggregates cleanup failure without replacing the operation failur
     },
   )
 })
+
+test('workflow rejects an already-cancelled request before runtime construction', async () => {
+  let buildCalls = 0
+  const runtimeBuilder: any = {
+    build: async () => {
+      buildCalls += 1
+      throw new Error('runtime must not be constructed')
+    },
+  }
+  const workflow = new WebDesignAgentWorkflowHandler(runtimeBuilder)
+  const controller = new AbortController()
+  controller.abort()
+
+  await assert.rejects(
+    () => workflow.generate({prompt: 'site'}, controller.signal),
+    /cancelled before runtime construction/i,
+  )
+  assert.equal(buildCalls, 0)
+})
