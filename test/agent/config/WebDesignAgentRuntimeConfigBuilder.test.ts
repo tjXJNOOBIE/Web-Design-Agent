@@ -51,6 +51,33 @@ test('configures official Playwright MCP as an opt-in browser capability', () =>
   assert.equal(servers['browser']?.continueOnError, false)
 })
 
+test('passes the installed Playwright browser path into the stdio child', () => {
+  const servers = serversFor(
+    new WebDesignAgentRuntimeConfigBuilder({
+      WEB_DESIGN_AGENT_ENABLE_PLAYWRIGHT: 'true',
+      PLAYWRIGHT_BROWSERS_PATH: '/ms-playwright',
+    }),
+  )
+
+  assert.deepEqual(servers['browser']?.env, {
+    PLAYWRIGHT_BROWSERS_PATH: '/ms-playwright',
+  })
+})
+
+test('prefers the Web Design Agent Playwright browser path override', () => {
+  const servers = serversFor(
+    new WebDesignAgentRuntimeConfigBuilder({
+      WEB_DESIGN_AGENT_ENABLE_PLAYWRIGHT: 'true',
+      PLAYWRIGHT_BROWSERS_PATH: '/generic-playwright',
+      WEB_DESIGN_AGENT_PLAYWRIGHT_BROWSERS_PATH: '/wda-playwright',
+    }),
+  )
+
+  assert.deepEqual(servers['browser']?.env, {
+    PLAYWRIGHT_BROWSERS_PATH: '/wda-playwright',
+  })
+})
+
 test('uses an installed browser executable when the deployment provides one', () => {
   const servers = serversFor(
     new WebDesignAgentRuntimeConfigBuilder({
