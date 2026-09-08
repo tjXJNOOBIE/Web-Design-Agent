@@ -20,6 +20,11 @@ import {DesignGenerationResultParser} from '../../design/validation/DesignGenera
 import {DesignResultValidationError} from '../../design/validation/DesignResultValidationError.js'
 import {WebDesignAgentBrowserTargetValidator} from '../../design/validation/WebDesignAgentBrowserTargetValidator.js'
 
+type NormalizedDesignGenerationRequest = DesignGenerationRequest & {
+  readonly prompt: string
+  readonly sourceMode: NonNullable<DesignGenerationRequest['sourceMode']>
+}
+
 interface StreamedDirectorInvocationData {
   readonly text: string
   readonly evidence: WebDesignAgentToolEvidenceCollector
@@ -28,11 +33,6 @@ interface StreamedDirectorInvocationData {
 interface ParsedGenerationInvocationData {
   readonly result: DesignGenerationResult
   readonly evidence: WebDesignAgentToolEvidenceCollector
-}
-
-type NormalizedDesignGenerationRequest = DesignGenerationRequest & {
-  readonly prompt: string
-  readonly sourceMode: NonNullable<DesignGenerationRequest['sourceMode']>
 }
 
 const FAILED_INVOCATION_STOP_REASONS = new Set([
@@ -63,6 +63,7 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
 
   public async generate(
     request: DesignGenerationRequest,
+    cancelSignal?: AbortSignal,
   ): Promise<DesignGenerationResult> {
     this.assertOpen()
 
@@ -83,7 +84,7 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
       )
     }
 
-    let invocation = await this.invokeGeneration(normalizedRequest)
+    let invocation = await this.invokeGeneration(normalizedRequest, '', cancelSignal)
     let result = invocation.result
     let check = this.distance.evaluate(result.candidates)
 
@@ -99,6 +100,7 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
       invocation = await this.invokeGeneration(
         normalizedRequest,
         `\nDETERMINISTIC DIVERSITY FAILURE: ${pairs}. Regenerate complete A/B/C with greater structural distance.`,
+        cancelSignal,
       )
       result = invocation.result
       check = this.distance.evaluate(result.candidates)
@@ -121,6 +123,7 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
 
   public async refine(
     request: DesignRefinementRequest,
+    cancelSignal?: AbortSignal,
   ): Promise<DesignCandidateData> {
     this.assertOpen()
 
@@ -129,6 +132,7 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
       'No extra text feedback; preserve the slider-state preference exactly.'
     const invocation = await this.streamDirector(
       `OPERATION: refine-selected-candidate\nCandidate: ${JSON.stringify(request.candidate)}\nVisualState: ${JSON.stringify(request.visualState)}\nHuman feedback: ${feedback}\nInvoke only the matching candidate specialist then visual_critic. Return one complete candidate JSON object.`,
+      cancelSignal,
     )
     const candidate = this.parser.parseCandidate(invocation.text)
 
@@ -146,7 +150,10 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
     }
   }
 
-  public async createConcepts(prompt: string): Promise<DesignConceptSetData> {
+  public async createConcepts(
+    prompt: string,
+    cancelSignal?: AbortSignal,
+  ): Promise<DesignConceptSetData> {
     this.assertOpen()
 
     const normalized = prompt.trim()
@@ -161,6 +168,7 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
 
     const invocation = await this.streamDirector(
       `OPERATION: concept-first\nPrompt: ${normalized}\nInvoke concept_artist, use its real image-provider results, and return exactly three real A/B/C concept results as JSON.`,
+      cancelSignal,
     )
     const concepts = this.parser.parseConceptSet(invocation.text, normalized)
 
@@ -201,8 +209,12 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
   private async invokeGeneration(
     request: NormalizedDesignGenerationRequest,
     suffix = '',
+    cancelSignal?: AbortSignal,
   ): Promise<ParsedGenerationInvocationData> {
-    const invocation = await this.streamDirector(`${this.prompt(request)}${suffix}`)
+    const invocation = await this.streamDirector(
+      `${this.prompt(request)}${suffix}`,
+      cancelSignal,
+    )
 
     return {
       result: this.parser.parseGeneration(invocation.text),
@@ -212,10 +224,15 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
 
   private async streamDirector(
     prompt: string,
+    cancelSignal?: AbortSignal,
   ): Promise<StreamedDirectorInvocationData> {
     const evidence = new WebDesignAgentToolEvidenceCollector()
+    const timeoutSignal = AbortSignal.timeout(this.invocationPolicy.timeoutMs)
+    const invocationSignal = cancelSignal === undefined
+      ? timeoutSignal
+      : AbortSignal.any([cancelSignal, timeoutSignal])
     const stream = this.director.streamAgent(prompt, {
-      cancelSignal: AbortSignal.timeout(this.invocationPolicy.timeoutMs),
+      cancelSignal: invocationSignal,
       limits: {
         turns: this.invocationPolicy.maxTurns,
         outputTokens: this.invocationPolicy.maxOutputTokens,
