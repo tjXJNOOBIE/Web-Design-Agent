@@ -55,11 +55,7 @@ export class WebDesignAgentRuntimeConfigBuilder {
       'Web Design Agent Director',
       WEB_DESIGN_AGENT_DIRECTOR_SYSTEM_PROMPT,
       agentTools,
-      {
-        components: false,
-        browser: false,
-        conceptImages: false,
-      },
+      { components: false, browser: false, conceptImages: false },
     )
   }
 
@@ -69,11 +65,7 @@ export class WebDesignAgentRuntimeConfigBuilder {
       `Web Design Candidate ${id}`,
       buildWebDesignCandidateSystemPrompt(id),
       [],
-      {
-        components: true,
-        browser: true,
-        conceptImages: false,
-      },
+      { components: true, browser: true, conceptImages: false },
     )
   }
 
@@ -83,11 +75,7 @@ export class WebDesignAgentRuntimeConfigBuilder {
       'Web Design Agent Visual Critic',
       WEB_DESIGN_AGENT_CRITIC_SYSTEM_PROMPT,
       [],
-      {
-        components: false,
-        browser: false,
-        conceptImages: false,
-      },
+      { components: false, browser: false, conceptImages: false },
     )
   }
 
@@ -97,11 +85,7 @@ export class WebDesignAgentRuntimeConfigBuilder {
       'Web Design Agent Concept Artist',
       WEB_DESIGN_AGENT_CONCEPT_SYSTEM_PROMPT,
       [],
-      {
-        components: false,
-        browser: false,
-        conceptImages: true,
-      },
+      { components: false, browser: false, conceptImages: true },
     )
   }
 
@@ -119,17 +103,9 @@ export class WebDesignAgentRuntimeConfigBuilder {
     const model = this.optionalString(this.environment['WEB_DESIGN_AGENT_MODEL_ID'])
     const mcpServers: WebDesignAgentMcpServerMap = {}
 
-    if (toolPolicy.components) {
-      this.addComponentServer(mcpServers)
-    }
-
-    if (toolPolicy.browser) {
-      this.addBrowserServer(mcpServers)
-    }
-
-    if (toolPolicy.conceptImages) {
-      this.addConceptImageServer(mcpServers)
-    }
+    if (toolPolicy.components) this.addComponentServer(mcpServers)
+    if (toolPolicy.browser) this.addBrowserServer(mcpServers)
+    if (toolPolicy.conceptImages) this.addConceptImageServer(mcpServers)
 
     return {
       agent: {
@@ -139,10 +115,7 @@ export class WebDesignAgentRuntimeConfigBuilder {
         printer: false,
         ...(tools.length === 0 ? {} : { tools: [...tools] }),
         ...(model === undefined ? {} : { model }),
-        traceAttributes: {
-          product: 'web-design-agent',
-          role: id,
-        },
+        traceAttributes: { product: 'web-design-agent', role: id },
       },
       ...(Object.keys(mcpServers).length === 0
         ? {}
@@ -159,17 +132,13 @@ export class WebDesignAgentRuntimeConfigBuilder {
 
   private addComponentServer(mcpServers: WebDesignAgentMcpServerMap): void {
     const apiKey = this.optionalString(this.environment['API_KEY_21ST'])
-    if (apiKey === undefined) {
-      return
-    }
+    if (apiKey === undefined) return
 
     mcpServers['components'] = {
       url:
         this.optionalString(this.environment['WEB_DESIGN_AGENT_21ST_MCP_URL']) ??
         'https://21st.dev/api/mcp',
-      headers: {
-        'x-api-key': apiKey,
-      },
+      headers: { 'x-api-key': apiKey },
       prefix: 'components',
       continueOnError: true,
     }
@@ -189,12 +158,7 @@ export class WebDesignAgentRuntimeConfigBuilder {
         url: browserUrl,
         ...(authorization === undefined
           ? {}
-          : {
-              headers: {
-                Authorization: authorization,
-              },
-            }),
-        prefix: 'browser',
+          : { headers: { Authorization: authorization } }),
         continueOnError: false,
       }
       return
@@ -217,7 +181,6 @@ export class WebDesignAgentRuntimeConfigBuilder {
         '--headless',
         '--isolated',
       ],
-      prefix: 'browser',
       continueOnError: false,
     }
   }
@@ -238,21 +201,14 @@ export class WebDesignAgentRuntimeConfigBuilder {
         ) ?? 'https://mcp.higgsfield.ai/mcp',
       ...(authorization === undefined
         ? {}
-        : {
-            headers: {
-              Authorization: authorization,
-            },
-          }),
+        : { headers: { Authorization: authorization } }),
       prefix: 'assets',
       continueOnError: false,
     }
   }
 
   private optionalString(value: string | undefined): string | undefined {
-    if (value === undefined) {
-      return undefined
-    }
-
+    if (value === undefined) return undefined
     const normalized = value.trim()
     return normalized.length === 0 ? undefined : normalized
   }
