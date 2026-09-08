@@ -38,9 +38,9 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
     private readonly director: IStrandsAgentRuntime,
     private readonly owned: readonly IStrandsAgentRuntime[],
     private readonly capabilities: WebDesignAgentCapabilityData,
+    private readonly browserTargets = new WebDesignAgentBrowserTargetValidator(),
     private readonly parser = new DesignGenerationResultParser(),
     private readonly distance = new DesignDistanceEvaluator(),
-    private readonly browserTargets = new WebDesignAgentBrowserTargetValidator(),
   ) {}
 
   public async generate(
@@ -293,17 +293,8 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
   ): Promise<NormalizedDesignGenerationRequest> {
     if (
       request.sourceMode === 'reference-image' &&
-      request.referenceImageUrl?.trim().length !== 0 &&
-      request.referenceImageUrl === undefined
-    ) {
-      throw new DesignResultValidationError(
-        'reference-image mode requires referenceImageUrl.',
-      )
-    }
-
-    if (
-      request.sourceMode === 'reference-image' &&
-      (request.referenceImageUrl === undefined || request.referenceImageUrl.trim().length === 0)
+      (request.referenceImageUrl === undefined ||
+        request.referenceImageUrl.trim().length === 0)
     ) {
       throw new DesignResultValidationError(
         'reference-image mode requires referenceImageUrl.',
@@ -319,30 +310,36 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
       )
     }
 
-    if (request.sourceMode === 'concept-first' && request.selectedConcept === undefined) {
+    if (
+      request.sourceMode === 'concept-first' &&
+      request.selectedConcept === undefined
+    ) {
       throw new DesignResultValidationError(
         'concept-first mode requires a selectedConcept.',
       )
     }
 
-    const referenceImageUrl = request.referenceImageUrl === undefined
-      ? undefined
-      : await this.browserTargets.validate(
-          request.referenceImageUrl,
-          'referenceImageUrl',
-        )
-    const targetUrl = request.targetUrl === undefined
-      ? undefined
-      : await this.browserTargets.validate(request.targetUrl, 'targetUrl')
-    const selectedConcept = request.selectedConcept === undefined
-      ? undefined
-      : {
-          ...request.selectedConcept,
-          imageUrl: await this.browserTargets.validate(
-            request.selectedConcept.imageUrl,
-            'selectedConcept.imageUrl',
-          ),
-        }
+    const referenceImageUrl =
+      request.referenceImageUrl === undefined
+        ? undefined
+        : await this.browserTargets.validate(
+            request.referenceImageUrl,
+            'referenceImageUrl',
+          )
+    const targetUrl =
+      request.targetUrl === undefined
+        ? undefined
+        : await this.browserTargets.validate(request.targetUrl, 'targetUrl')
+    const selectedConcept =
+      request.selectedConcept === undefined
+        ? undefined
+        : {
+            ...request.selectedConcept,
+            imageUrl: await this.browserTargets.validate(
+              request.selectedConcept.imageUrl,
+              'selectedConcept.imageUrl',
+            ),
+          }
 
     return {
       ...request,
