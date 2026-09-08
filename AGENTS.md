@@ -36,6 +36,8 @@ Before changing code, architecture, tests, packaging, lifecycle, or documentatio
 - Do not recreate `tavall-di`, Tavall Cache, Registry, Database, Concurrency, EventBus, Scheduler, or other Java-owned systems in TypeScript. Consume owning runtimes through typed MCP/tool boundaries when needed.
 - Product prompts, permissions, tool exposure, workflows, and user-facing policy belong here.
 - The public HTTP MCP product endpoint is **NoAuth**. Clients do not log in or provide Web Design Agent credentials. Deployment-owned model/provider credentials are internal service capabilities, not client authentication.
+- NoAuth never means unrestricted network reach. A public HTTP deployment that exposes browser capability must fail closed unless the browser execution network is isolated from private, loopback, link-local, metadata, service-control, and internal Tavall networks.
+- Explicit browserable source inputs must be validated before Strands invocation: HTTP(S) only, safe public ports, no URL credentials, and no private/reserved/internal DNS or address targets. Application URL checks supplement rather than replace deployment egress isolation because redirects and DNS rebinding exist.
 - Rate limits, concurrency limits, request-size limits, and compute/resource ceilings are abuse controls and must not be described as product authentication.
 - Do not invent MCP operation names or claim integration behavior until it is backed by the connected catalog.
 - Do not add persistence/cache/registry state until authority, lifetime, replacement, stale/miss behavior, and cleanup ownership are explicit.
@@ -44,15 +46,20 @@ Before changing code, architecture, tests, packaging, lifecycle, or documentatio
 
 - For material visual design work, preserve the established Tavall A/B/C invariant: create genuinely distinct candidates rather than cosmetic variants.
 - Inspect the real product and current design tooling before claiming browser/design behavior.
+- Browser validation and provider-use claims must come from observed native Strands tool lifecycle evidence, never from model-authored booleans, URLs, notes, or prose.
+- Browser snapshot/screenshot evidence counts only when it is bound to a successful navigation target. Source-dependent modes must bind evidence to the validated requested source target.
+- Failed navigation invalidates the current inspection target until a later successful navigation establishes a new one.
+- Concept-first output requires observed successful image-provider tool execution; returned image URLs alone are not proof of provider use.
 - Use the current Tavall Web Agent/design skill/tool surface when connected; do not recreate a parallel browser or design framework here.
 - Preserve accepted/rejected design evidence and validate responsive/accessibility behavior when those systems are implemented.
 
 ## Tests and validation
 
 - Use delegate-style tests against real product classes.
-- Fake only true external boundaries such as the bridge lifecycle boundary, MCP endpoints, model providers, or cloud services.
+- Fake only true external boundaries such as the bridge lifecycle boundary, MCP endpoints, model providers, DNS resolution, or cloud services.
 - Never report the bridge contract shim as physical Strands SDK validation.
 - Record exactly which checks ran and keep Draft PRs blocked while required external/runtime evidence is unavailable.
+- GitHub/Codex review may provide fallback static review when Tavall execution tooling is unavailable, but it does not replace the required physical durable-environment validation before promotion.
 
 ## Git
 
