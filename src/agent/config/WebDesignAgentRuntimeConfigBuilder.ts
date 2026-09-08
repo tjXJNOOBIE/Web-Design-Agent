@@ -168,12 +168,15 @@ export class WebDesignAgentRuntimeConfigBuilder {
       return
     }
 
+    const playwrightEnvironment = this.buildPlaywrightEnvironment()
+
     mcpServers['browser'] = {
       command:
         this.optionalString(
           this.environment['WEB_DESIGN_AGENT_PLAYWRIGHT_MCP_COMMAND'],
         ) ?? 'npx',
       args: this.buildPlaywrightArgs(),
+      ...(playwrightEnvironment === undefined ? {} : { env: playwrightEnvironment }),
       continueOnError: false,
     }
   }
@@ -196,6 +199,19 @@ export class WebDesignAgentRuntimeConfigBuilder {
       '--headless',
       '--isolated',
     ]
+  }
+
+  private buildPlaywrightEnvironment(): Record<string, string> | undefined {
+    const browsersPath =
+      this.optionalString(
+        this.environment['WEB_DESIGN_AGENT_PLAYWRIGHT_BROWSERS_PATH'],
+      ) ?? this.optionalString(this.environment['PLAYWRIGHT_BROWSERS_PATH'])
+
+    if (browsersPath === undefined) return undefined
+
+    return {
+      PLAYWRIGHT_BROWSERS_PATH: browsersPath,
+    }
   }
 
   private addConceptImageServer(mcpServers: WebDesignAgentMcpServerMap): void {
