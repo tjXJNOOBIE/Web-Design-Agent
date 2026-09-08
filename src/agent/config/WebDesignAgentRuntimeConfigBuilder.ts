@@ -178,6 +178,7 @@ export class WebDesignAgentRuntimeConfigBuilder {
         this.optionalString(
           this.environment['WEB_DESIGN_AGENT_PLAYWRIGHT_MCP_PACKAGE'],
         ) ?? '@playwright/mcp@0.0.80',
+        '--browser=chromium',
         '--headless',
         '--isolated',
       ],
