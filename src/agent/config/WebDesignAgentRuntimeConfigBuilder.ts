@@ -1,4 +1,4 @@
-import type {IStrandsAgentRuntime,StrandsAgentRuntimeConfig} from '@tjxjnoobie/custom-strands-bridge'
+import type {IStrandsAgentRuntime,StrandsAgentRuntimeConfig} from '@tjxjnoobie/strands-bridge'
 import {WEB_DESIGN_AGENT_CONCEPT_SYSTEM_PROMPT,WEB_DESIGN_AGENT_CRITIC_SYSTEM_PROMPT,WEB_DESIGN_AGENT_DIRECTOR_SYSTEM_PROMPT,buildWebDesignCandidateSystemPrompt} from '../prompt/WebDesignAgentSystemPrompt.js'
 export type WebDesignAgentEnvironment=Readonly<Record<string,string|undefined>>
 export type WebDesignAgentTool=ReturnType<IStrandsAgentRuntime['createAgentTool']>
