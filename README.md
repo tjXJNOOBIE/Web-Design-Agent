@@ -1,41 +1,140 @@
 # Web Design Agent
 
-A Strands-powered product design agent for evidence-driven web design and implementation.
+Web Design Agent is a Strands-powered web design product for turning vague prompts into three genuinely different, real website implementations, reviewing them inline, visually tuning them, and refining the selected direction.
 
-**Agents for Humans track:** Professional
-
-## Install and run
-
-```bash
-npx @tjxjnoobie/web-design-agent "your request"
-```
-
-Node.js 22+ is required. Model-provider credentials/configuration are supplied through Strands and the environment. Set `WEB_DESIGN_AGENT_MODEL_ID` to select an explicit Strands model ID.
-
-Set `WEB_DESIGN_AGENT_MCP_URL` when a real product tool/MCP surface is available. The foundation does not fabricate one.
-
-Optional MCP authorization may be supplied through `WEB_DESIGN_AGENT_MCP_AUTHORIZATION`. Secrets are never committed.
-
-## Architecture
+The product is built around a simple human flow:
 
 ```text
-Web Design Agent
-    -> @tjxjnoobie/custom-strands-bridge
-        -> @strands-agents/sdk
-            -> model provider
-            -> typed MCP/tool surfaces
-                -> owning Tavall/third-party runtimes
+vague request
+  -> infer product brief
+  -> build structurally different A / B / C
+  -> render/review real implementations
+  -> tune visual controls or give chat feedback
+  -> refine selected candidate
+  -> export real HTML/CSS/JS and reusable design-system evidence
 ```
 
-This repository owns Web Design Agent product behavior. Shared Strands bootstrap, MCP composition, invocation, cancellation, agent-as-tool composition, and cleanup remain in `custom-strands-bridge`. Tavall Java infrastructure remains in its owning Java runtimes and is consumed over typed boundaries instead of being recreated in TypeScript.
+## Product surfaces
 
-## Development
+- Public stateless HTTP MCP endpoint at `/mcp` when `web-design-agent-mcp` is hosted.
+- Stdio MCP mode for local clients.
+- MCP App A/B/C review surface for hosts that support MCP Apps.
+- CLI generation through `web-design-agent`.
+- One-shot vague-prompt evaluation through `web-design-agent-eval`.
+
+The HTTP server intentionally does not require product authentication. Each MCP request constructs an isolated Web Design Agent runtime so anonymous clients do not share model/session state.
+
+## Strands architecture
+
+The product consumes Strands only through `@tjxjnoobie/custom-strands-bridge`.
+
+```text
+MCP / CLI request
+  -> WebDesignAgentWorkflowHandler
+  -> WebDesignAgentRuntimeBuilder
+     -> Candidate A Strands runtime
+     -> Candidate B Strands runtime
+     -> Candidate C Strands runtime
+     -> Visual Critic Strands runtime
+     -> optional Concept Artist Strands runtime
+     -> Design Director Strands runtime
+          with specialists exposed as native agent tools
+  -> deterministic A/B/C validation
+  -> typed result
+  -> reverse-order runtime close
+```
+
+The Design Director owns the main model/tool loop. Candidate specialists own implementation directions. The critic evaluates output without becoming a fourth implementation style. Optional concept-first generation is isolated behind its own specialist and external capability.
+
+## A/B/C contract
+
+A/B/C variants are required to differ structurally, not only cosmetically. Every candidate carries a typed Design Genome covering composition, navigation, hero strategy, typography, density, geometry, surface model, depth, motion, content rhythm, and imagery strategy.
+
+`DesignDistanceEvaluator` checks all three candidate pairs. If a pair is too similar, the runtime permits one complete regeneration pass and then rejects the result if diversity still fails.
+
+Every candidate also carries:
+
+- real HTML/CSS/optional JavaScript;
+- optional additional page routes using the same design language;
+- design-system tokens, typography, reusable component names, and principles;
+- live visual-state defaults;
+- critique notes;
+- browser evidence only when browser tooling actually executed.
+
+## Live visual review
+
+The MCP App review surface supports:
+
+- A/B/C switching;
+- simultaneous comparison;
+- desktop, tablet, and mobile preview widths;
+- multi-page route switching;
+- density, spacing, radius, font scale, hero scale, contrast, depth, and motion controls;
+- immediate preview changes without a model round trip;
+- refinement from the exact visual-state snapshot plus optional chat feedback;
+- selected-candidate context handoff;
+- standalone export;
+- portable preference-profile generation.
+
+The generated implementation remains immutable while the review UI keeps temporary visual state separately. A model call happens only when the user asks the agent to reconcile those preferences into a new implementation.
+
+## External design tools
+
+External capabilities are optional and environment-owned:
+
+| Capability | Configuration | Behavior |
+| --- | --- | --- |
+| 21st component research | `API_KEY_21ST` | Adds `https://21st.dev/api/mcp` by default. Results are design inspiration; they do not force React/Tailwind into the target stack. |
+| Browser/render evidence | `WEB_DESIGN_AGENT_BROWSER_MCP_URL` | Enables truthful browser/reference/existing-site inspection. Reference and existing-site modes reject when this capability is absent. |
+| Higgsfield concept-first | `WEB_DESIGN_AGENT_ENABLE_HIGGSFIELD=true` | Adds `https://mcp.higgsfield.ai/mcp` by default to the concept specialist. Authorization remains environment-owned. Concept images are references, not implementation evidence. |
+
+Optional endpoint/auth overrides are available through the matching `WEB_DESIGN_AGENT_*` environment variables in `WebDesignAgentRuntimeConfigBuilder`.
+
+## Run
+
+After dependencies are installed and the shared bridge is available:
 
 ```bash
-npm install
-npm run check
+npm run build
+node dist/mcp/main.js
 ```
 
-The bridge dependency is temporarily pinned to exact Git commit `677f141a73fcc1bed23edf02c8fdfbd116fd034d` while the bridge foundation is still in Draft review. Replace that source pin with the published bridge version once the bridge promotion gates are complete.
+Local stdio MCP:
 
-See [`docs/web-design-agent/WEB_DESIGN_AGENT_FINAL_DRAFT.md`](docs/web-design-agent/WEB_DESIGN_AGENT_FINAL_DRAFT.md) for the current product foundation contract.
+```bash
+node dist/mcp/main.js --stdio
+```
+
+CLI:
+
+```bash
+node dist/cli/main.js "make a competitive Minecraft PvP website"
+```
+
+Evaluation corpus:
+
+```bash
+node dist/evaluation/main.js
+```
+
+## Current validation status
+
+Implementation commit `6490fb8e0ee3aaafa4e321bcf78f98ae813aeab0` passed local strict TypeScript, server build, and 17/17 delegate/product contract tests using local stubs only for true external package/runtime boundaries.
+
+That is not physical Strands/MCP/browser/model validation. The following remain promotion gates:
+
+- real npm dependency installation and lockfile generation;
+- physical `@strands-agents/sdk` execution through the shared bridge;
+- real MCP SDK + MCP App production bundle;
+- authorized model invocation;
+- real 21st MCP call;
+- real browser render/screenshot/interaction evidence;
+- real Higgsfield concept generation when enabled;
+- clean consumer install/npx smoke test;
+- hosted ChatGPT/Claude MCP App rendering.
+
+The Draft PR stays Draft until those claims have actual evidence. Computers already generate enough fiction without release notes joining in.
+
+## License
+
+MIT.
