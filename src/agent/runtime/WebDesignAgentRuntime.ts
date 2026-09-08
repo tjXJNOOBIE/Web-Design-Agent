@@ -14,6 +14,7 @@ import type {DesignRefinementRequest} from '../../design/data/DesignRefinementRe
 import {DesignDistanceEvaluator} from '../../design/validation/DesignDistanceEvaluator.js'
 import {DesignGenerationResultParser} from '../../design/validation/DesignGenerationResultParser.js'
 import {DesignResultValidationError} from '../../design/validation/DesignResultValidationError.js'
+import {WebDesignAgentBrowserTargetValidator} from '../../design/validation/WebDesignAgentBrowserTargetValidator.js'
 
 interface StreamedDirectorInvocationData {
   readonly text: string
@@ -25,6 +26,11 @@ interface ParsedGenerationInvocationData {
   readonly evidence: WebDesignAgentToolEvidenceCollector
 }
 
+type NormalizedDesignGenerationRequest = DesignGenerationRequest & {
+  readonly prompt: string
+  readonly sourceMode: NonNullable<DesignGenerationRequest['sourceMode']>
+}
+
 export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
   private closed = false
 
@@ -34,6 +40,7 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
     private readonly capabilities: WebDesignAgentCapabilityData,
     private readonly parser = new DesignGenerationResultParser(),
     private readonly distance = new DesignDistanceEvaluator(),
+    private readonly browserTargets = new WebDesignAgentBrowserTargetValidator(),
   ) {}
 
   public async generate(
@@ -46,12 +53,11 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
       throw new DesignResultValidationError('Design prompt must be non-blank.')
     }
 
-    const sourceMode = request.sourceMode ?? 'code-first'
-    const normalizedRequest = {
+    const normalizedRequest = await this.normalizeGenerationRequest({
       ...request,
       prompt,
-      sourceMode,
-    }
+      sourceMode: request.sourceMode ?? 'code-first',
+    })
 
     if (this.requiresBrowser(normalizedRequest) && !this.capabilities.browser) {
       throw new DesignResultValidationError(
@@ -107,6 +113,12 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
       `OPERATION: refine-selected-candidate\nCandidate: ${JSON.stringify(request.candidate)}\nVisualState: ${JSON.stringify(request.visualState)}\nHuman feedback: ${feedback}\nInvoke only the matching candidate specialist then visual_critic. Return one complete candidate JSON object.`,
     )
     const candidate = this.parser.parseCandidate(invocation.text)
+
+    if (candidate.id !== request.candidate.id) {
+      throw new DesignResultValidationError(
+        `Refinement requested candidate ${request.candidate.id} but the agent returned candidate ${candidate.id}.`,
+      )
+    }
 
     return {
       ...candidate,
@@ -169,10 +181,7 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
   }
 
   private async invokeGeneration(
-    request: DesignGenerationRequest & {
-      prompt: string
-      sourceMode: NonNullable<DesignGenerationRequest['sourceMode']>
-    },
+    request: NormalizedDesignGenerationRequest,
     suffix = '',
   ): Promise<ParsedGenerationInvocationData> {
     const invocation = await this.streamDirector(`${this.prompt(request)}${suffix}`)
@@ -205,16 +214,14 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
   private applyRuntimeEvidence(
     result: DesignGenerationResult,
     evidence: WebDesignAgentToolEvidenceCollector,
-    request: DesignGenerationRequest & {
-      prompt: string
-      sourceMode: NonNullable<DesignGenerationRequest['sourceMode']>
-    },
+    request: NormalizedDesignGenerationRequest,
   ): DesignGenerationResult {
     const candidateIds: readonly DesignCandidateId[] = result.candidates.map(
       (candidate) => candidate.id,
     )
+    const expectedBrowserTarget = this.expectedBrowserTarget(request)
     const missingBrowserInspection = this.capabilities.browser
-      ? evidence.missingBrowserInspection(candidateIds)
+      ? evidence.missingBrowserInspection(candidateIds, expectedBrowserTarget)
       : candidateIds
     const browserValidated =
       this.capabilities.browser && missingBrowserInspection.length === 0
@@ -234,11 +241,13 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
       )
     } else if (browserValidated) {
       notes.push(
-        'Runtime evidence: successful browser inspection was observed for candidates A, B, and C.',
+        expectedBrowserTarget === undefined
+          ? 'Runtime evidence: successful browser navigation-bound inspection was observed for candidates A, B, and C.'
+          : 'Runtime evidence: successful browser inspection of the required source target was observed for candidates A, B, and C.',
       )
     } else {
       notes.push(
-        `Runtime evidence: successful browser inspection was not observed for candidates ${missingBrowserInspection.join(', ')}.`,
+        `Runtime evidence: required browser inspection was not observed for candidates ${missingBrowserInspection.join(', ')}.`,
       )
     }
 
@@ -259,7 +268,7 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
 
     if (this.requiresBrowser(request) && !browserValidated) {
       throw new DesignResultValidationError(
-        `This design mode requires successful browser inspection for every candidate; missing runtime evidence for ${missingBrowserInspection.join(', ')}.`,
+        `This design mode requires successful browser inspection of its source for every candidate; missing runtime evidence for ${missingBrowserInspection.join(', ')}.`,
       )
     }
 
@@ -279,12 +288,79 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
     }
   }
 
-  private prompt(
-    request: DesignGenerationRequest & {
-      prompt: string
-      sourceMode: NonNullable<DesignGenerationRequest['sourceMode']>
-    },
-  ): string {
+  private async normalizeGenerationRequest(
+    request: NormalizedDesignGenerationRequest,
+  ): Promise<NormalizedDesignGenerationRequest> {
+    if (
+      request.sourceMode === 'reference-image' &&
+      request.referenceImageUrl?.trim().length !== 0 &&
+      request.referenceImageUrl === undefined
+    ) {
+      throw new DesignResultValidationError(
+        'reference-image mode requires referenceImageUrl.',
+      )
+    }
+
+    if (
+      request.sourceMode === 'reference-image' &&
+      (request.referenceImageUrl === undefined || request.referenceImageUrl.trim().length === 0)
+    ) {
+      throw new DesignResultValidationError(
+        'reference-image mode requires referenceImageUrl.',
+      )
+    }
+
+    if (
+      request.sourceMode === 'existing-site' &&
+      (request.targetUrl === undefined || request.targetUrl.trim().length === 0)
+    ) {
+      throw new DesignResultValidationError(
+        'existing-site mode requires targetUrl.',
+      )
+    }
+
+    if (request.sourceMode === 'concept-first' && request.selectedConcept === undefined) {
+      throw new DesignResultValidationError(
+        'concept-first mode requires a selectedConcept.',
+      )
+    }
+
+    const referenceImageUrl = request.referenceImageUrl === undefined
+      ? undefined
+      : await this.browserTargets.validate(
+          request.referenceImageUrl,
+          'referenceImageUrl',
+        )
+    const targetUrl = request.targetUrl === undefined
+      ? undefined
+      : await this.browserTargets.validate(request.targetUrl, 'targetUrl')
+    const selectedConcept = request.selectedConcept === undefined
+      ? undefined
+      : {
+          ...request.selectedConcept,
+          imageUrl: await this.browserTargets.validate(
+            request.selectedConcept.imageUrl,
+            'selectedConcept.imageUrl',
+          ),
+        }
+
+    return {
+      ...request,
+      ...(referenceImageUrl === undefined ? {} : {referenceImageUrl}),
+      ...(targetUrl === undefined ? {} : {targetUrl}),
+      ...(selectedConcept === undefined ? {} : {selectedConcept}),
+    }
+  }
+
+  private expectedBrowserTarget(
+    request: NormalizedDesignGenerationRequest,
+  ): string | undefined {
+    if (request.targetUrl !== undefined) return request.targetUrl
+    if (request.sourceMode === 'reference-image') return request.referenceImageUrl
+    return undefined
+  }
+
+  private prompt(request: NormalizedDesignGenerationRequest): string {
     const lines = [
       'OPERATION: generate-real-abc',
       `Prompt: ${request.prompt}`,
@@ -294,10 +370,16 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
     ]
 
     if (request.referenceImageUrl) {
-      lines.push(`Reference image URL: ${request.referenceImageUrl}`)
+      lines.push(
+        `Reference image URL: ${request.referenceImageUrl}`,
+        'Each candidate must navigate to and inspect this exact validated public reference target before claiming source-grounded browser evidence.',
+      )
     }
     if (request.targetUrl) {
-      lines.push(`Existing site target URL: ${request.targetUrl}`)
+      lines.push(
+        `Existing site target URL: ${request.targetUrl}`,
+        'Each candidate must navigate to and inspect this exact validated public target before claiming source-grounded browser evidence.',
+      )
     }
     if (request.selectedConcept) {
       lines.push(`Selected concept: ${JSON.stringify(request.selectedConcept)}`)
