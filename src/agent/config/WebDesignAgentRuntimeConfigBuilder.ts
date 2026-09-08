@@ -64,7 +64,6 @@ export class WebDesignAgentRuntimeConfigBuilder {
     return {
       components: this.optionalString(this.environment['API_KEY_21ST']) !== undefined,
       browser: browserUrl !== undefined || localPlaywright,
-      ...(localPlaywright ? {finalCandidatePreview: true} : {}),
       conceptImages: this.optionalBoolean(
         this.environment['WEB_DESIGN_AGENT_ENABLE_HIGGSFIELD'],
       ),
