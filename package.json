@@ -16,6 +16,7 @@
     "typecheck":"tsc -p tsconfig.json --noEmit",
     "test":"tsc -p tsconfig.test.json && node --test \".test-dist/test/**/*.test.js\"",
     "test:integ:mcp":"npm run build && node --test test/integ/mcp/*.test.mjs",
+    "test:integ:browser":"npm run build:server && node --test test/integ/browser/*.test.mjs",
     "check":"npm run typecheck && npm run test && npm run build",
     "check:real":"npm run typecheck && npm run test && npm run test:integ:mcp",
     "serve":"node ./dist/mcp/main.js",
