@@ -13,6 +13,9 @@ import {
 export type WebDesignAgentEnvironment = Readonly<Record<string, string | undefined>>
 export type WebDesignAgentTool = ReturnType<IStrandsAgentRuntime['createAgentTool']>
 
+export const DEFAULT_WEB_DESIGN_AGENT_MODEL_ID =
+  'global.anthropic.claude-sonnet-4-6'
+
 type WebDesignAgentMcpServerMap = Exclude<
   NonNullable<StrandsAgentRuntimeConfig['mcpServers']>,
   string
@@ -55,7 +58,7 @@ export class WebDesignAgentRuntimeConfigBuilder {
       'Web Design Agent Director',
       WEB_DESIGN_AGENT_DIRECTOR_SYSTEM_PROMPT,
       agentTools,
-      { components: false, browser: false, conceptImages: false },
+      {components: false, browser: false, conceptImages: false},
     )
   }
 
@@ -65,7 +68,7 @@ export class WebDesignAgentRuntimeConfigBuilder {
       `Web Design Candidate ${id}`,
       buildWebDesignCandidateSystemPrompt(id),
       [],
-      { components: true, browser: true, conceptImages: false },
+      {components: true, browser: true, conceptImages: false},
     )
   }
 
@@ -75,7 +78,7 @@ export class WebDesignAgentRuntimeConfigBuilder {
       'Web Design Agent Visual Critic',
       WEB_DESIGN_AGENT_CRITIC_SYSTEM_PROMPT,
       [],
-      { components: false, browser: false, conceptImages: false },
+      {components: false, browser: false, conceptImages: false},
     )
   }
 
@@ -85,7 +88,7 @@ export class WebDesignAgentRuntimeConfigBuilder {
       'Web Design Agent Concept Artist',
       WEB_DESIGN_AGENT_CONCEPT_SYSTEM_PROMPT,
       [],
-      { components: false, browser: false, conceptImages: true },
+      {components: false, browser: false, conceptImages: true},
     )
   }
 
@@ -100,7 +103,9 @@ export class WebDesignAgentRuntimeConfigBuilder {
     tools: readonly WebDesignAgentTool[],
     toolPolicy: WebDesignAgentRuntimeToolPolicy,
   ): StrandsAgentRuntimeConfig {
-    const model = this.optionalString(this.environment['WEB_DESIGN_AGENT_MODEL_ID'])
+    const model =
+      this.optionalString(this.environment['WEB_DESIGN_AGENT_MODEL_ID']) ??
+      DEFAULT_WEB_DESIGN_AGENT_MODEL_ID
     const mcpServers: WebDesignAgentMcpServerMap = {}
 
     if (toolPolicy.components) this.addComponentServer(mcpServers)
@@ -111,11 +116,11 @@ export class WebDesignAgentRuntimeConfigBuilder {
       agent: {
         id,
         name,
+        model,
         systemPrompt,
         printer: false,
-        ...(tools.length === 0 ? {} : { tools: [...tools] }),
-        ...(model === undefined ? {} : { model }),
-        traceAttributes: { product: 'web-design-agent', role: id },
+        ...(tools.length === 0 ? {} : {tools: [...tools]}),
+        traceAttributes: {product: 'web-design-agent', role: id},
       },
       ...(Object.keys(mcpServers).length === 0
         ? {}
@@ -138,7 +143,7 @@ export class WebDesignAgentRuntimeConfigBuilder {
       url:
         this.optionalString(this.environment['WEB_DESIGN_AGENT_21ST_MCP_URL']) ??
         'https://21st.dev/api/mcp',
-      headers: { 'x-api-key': apiKey },
+      headers: {'x-api-key': apiKey},
       prefix: 'components',
       continueOnError: true,
     }
@@ -158,7 +163,7 @@ export class WebDesignAgentRuntimeConfigBuilder {
         url: browserUrl,
         ...(authorization === undefined
           ? {}
-          : { headers: { Authorization: authorization } }),
+          : {headers: {Authorization: authorization}}),
         continueOnError: false,
       }
       return
@@ -176,7 +181,7 @@ export class WebDesignAgentRuntimeConfigBuilder {
           this.environment['WEB_DESIGN_AGENT_PLAYWRIGHT_MCP_COMMAND'],
         ) ?? 'npx',
       args: this.buildPlaywrightArgs(),
-      ...(playwrightEnvironment === undefined ? {} : { env: playwrightEnvironment }),
+      ...(playwrightEnvironment === undefined ? {} : {env: playwrightEnvironment}),
       continueOnError: false,
     }
   }
@@ -230,7 +235,7 @@ export class WebDesignAgentRuntimeConfigBuilder {
         ) ?? 'https://mcp.higgsfield.ai/mcp',
       ...(authorization === undefined
         ? {}
-        : { headers: { Authorization: authorization } }),
+        : {headers: {Authorization: authorization}}),
       prefix: 'assets',
       continueOnError: false,
     }
