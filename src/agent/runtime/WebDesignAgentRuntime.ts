@@ -15,9 +15,8 @@ import type {DesignConceptSetData} from '../../design/data/DesignConceptData.js'
 import type {DesignGenerationRequest} from '../../design/data/DesignGenerationRequest.js'
 import type {DesignGenerationResult} from '../../design/data/DesignGenerationResult.js'
 import type {DesignRefinementRequest} from '../../design/data/DesignRefinementRequest.js'
-import {
-  type DesignCandidatePreviewTargetData,
-  type WebDesignAgentPreviewPublication,
+import type {
+  DesignCandidatePreviewTargetData,
   WebDesignAgentPreviewRuntime,
 } from '../../design/preview/WebDesignAgentPreviewRuntime.js'
 import {DesignDistanceEvaluator} from '../../design/validation/DesignDistanceEvaluator.js'
@@ -61,7 +60,6 @@ const FAILED_INVOCATION_STOP_REASONS = new Set([
 
 export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
   private closed = false
-  private previewPublication?: WebDesignAgentPreviewPublication
 
   public constructor(
     private readonly director: IStrandsAgentRuntime,
@@ -220,14 +218,6 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
       }
     }
 
-    try {
-      this.previewPublication?.close()
-    } catch (error) {
-      errors.push(error)
-    } finally {
-      this.previewPublication = undefined
-    }
-
     if (errors.length > 0) {
       throw new AggregateError(
         errors,
@@ -268,12 +258,10 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
       return undefined
     }
 
-    this.previewPublication?.close()
     const publication = this.previewRuntime.publish(
       candidates,
       this.previewBaseUrl,
     )
-    this.previewPublication = publication
     const targets = publication.targets
     const lines = [
       'OPERATION: inspect-final-code-first-previews',
@@ -291,11 +279,15 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
     }
 
     lines.push('Return JSON only: {"inspected":["A","B","C"]}.')
-    const inspection = await this.streamDirector(lines.join('\n'), cancelSignal)
 
-    return {
-      evidence: inspection.evidence,
-      targets,
+    try {
+      const inspection = await this.streamDirector(lines.join('\n'), cancelSignal)
+      return {
+        evidence: inspection.evidence,
+        targets,
+      }
+    } finally {
+      publication.close()
     }
   }
 
