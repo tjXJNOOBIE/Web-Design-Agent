@@ -1,6 +1,6 @@
 # Repository instructions
 
-`Web-Design-Agent` owns the Web Design Agent product. Shared Strands lifecycle/MCP behavior belongs in `tjXJNOOBIE/custom-strands-bridge`; product behavior stays here.
+`Web-Design-Agent` owns the Web Design Agent product. Shared thin Strands lifecycle/MCP integration belongs in `tjXJNOOBIE/strands-bridge`; product behavior stays here.
 
 ## Authoritative engineering guidance
 
@@ -29,12 +29,16 @@ Before changing code, architecture, tests, packaging, lifecycle, or documentatio
 
 ## Product boundaries
 
-- Do not depend directly on `@strands-agents/sdk`; consume Strands through `@tjxjnoobie/custom-strands-bridge`.
+- Strands is the agent framework and remains visibly responsible for the model/tool loop.
+- Do not create a second agent framework or mirror Strands SDK features locally.
+- Do not depend directly on `@strands-agents/sdk`; consume the validated Strands baseline through the thin `@tjxjnoobie/strands-bridge` package.
+- `strands-bridge` may own shared lifecycle/composition glue only when it adds real shared validation, cleanup, packaging, or lifecycle value; prefer native Strands capability over extra wrappers.
 - Do not recreate `tavall-di`, Tavall Cache, Registry, Database, Concurrency, EventBus, Scheduler, or other Java-owned systems in TypeScript. Consume owning runtimes through typed MCP/tool boundaries when needed.
 - Product prompts, permissions, tool exposure, workflows, and user-facing policy belong here.
+- The public HTTP MCP product endpoint is **NoAuth**. Clients do not log in or provide Web Design Agent credentials. Deployment-owned model/provider credentials are internal service capabilities, not client authentication.
+- Rate limits, concurrency limits, request-size limits, and compute/resource ceilings are abuse controls and must not be described as product authentication.
 - Do not invent MCP operation names or claim integration behavior until it is backed by the connected catalog.
 - Do not add persistence/cache/registry state until authority, lifetime, replacement, stale/miss behavior, and cleanup ownership are explicit.
-- Keep Strands visibly responsible for the model/tool loop for hackathon evidence.
 
 ## Web design behavior
 
@@ -46,7 +50,7 @@ Before changing code, architecture, tests, packaging, lifecycle, or documentatio
 ## Tests and validation
 
 - Use delegate-style tests against real product classes.
-- Fake only true external boundaries such as the bridge runtime, MCP endpoints, model providers, or cloud services.
+- Fake only true external boundaries such as the bridge lifecycle boundary, MCP endpoints, model providers, or cloud services.
 - Never report the bridge contract shim as physical Strands SDK validation.
 - Record exactly which checks ran and keep Draft PRs blocked while required external/runtime evidence is unavailable.
 
