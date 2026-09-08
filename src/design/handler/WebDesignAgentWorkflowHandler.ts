@@ -4,6 +4,7 @@ import type {DesignConceptSetData} from '../data/DesignConceptData.js'
 import type {DesignGenerationRequest} from '../data/DesignGenerationRequest.js'
 import type {DesignGenerationResult} from '../data/DesignGenerationResult.js'
 import type {DesignRefinementRequest} from '../data/DesignRefinementRequest.js'
+import {DesignResultValidationError} from '../validation/DesignResultValidationError.js'
 import type {IWebDesignAgentWorkflowHandler} from './IWebDesignAgentWorkflowHandler.js'
 
 type OperationOutcome<T> =
@@ -17,6 +18,7 @@ export class WebDesignAgentWorkflowHandler implements IWebDesignAgentWorkflowHan
     request: DesignGenerationRequest,
     cancelSignal?: AbortSignal,
   ): Promise<DesignGenerationResult> {
+    this.assertActive(cancelSignal)
     return this.withRuntime((runtime) => runtime.generate(request, cancelSignal))
   }
 
@@ -24,6 +26,7 @@ export class WebDesignAgentWorkflowHandler implements IWebDesignAgentWorkflowHan
     request: DesignRefinementRequest,
     cancelSignal?: AbortSignal,
   ): Promise<DesignCandidateData> {
+    this.assertActive(cancelSignal)
     return this.withRuntime((runtime) => runtime.refine(request, cancelSignal))
   }
 
@@ -31,6 +34,7 @@ export class WebDesignAgentWorkflowHandler implements IWebDesignAgentWorkflowHan
     prompt: string,
     cancelSignal?: AbortSignal,
   ): Promise<DesignConceptSetData> {
+    this.assertActive(cancelSignal)
     return this.withRuntime((runtime) => runtime.createConcepts(prompt, cancelSignal))
   }
 
@@ -72,5 +76,13 @@ export class WebDesignAgentWorkflowHandler implements IWebDesignAgentWorkflowHan
     }
 
     return outcome.value
+  }
+
+  private assertActive(cancelSignal: AbortSignal | undefined): void {
+    if (cancelSignal?.aborted) {
+      throw new DesignResultValidationError(
+        'Web Design Agent request was cancelled before runtime construction.',
+      )
+    }
   }
 }
