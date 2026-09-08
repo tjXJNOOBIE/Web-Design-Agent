@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
+import {DEFAULT_WEB_DESIGN_AGENT_INVOCATION_POLICY} from '../src/agent/config/WebDesignAgentRuntimeConfigBuilder.js'
 import {WebDesignAgentRuntime} from '../src/agent/runtime/WebDesignAgentRuntime.js'
 import {WebDesignAgentBrowserTargetValidator} from '../src/design/validation/WebDesignAgentBrowserTargetValidator.js'
 import {candidate, generation} from './fixture/DesignFixture.js'
@@ -21,6 +22,7 @@ function runtime(
     fake,
     [fake],
     capabilities,
+    DEFAULT_WEB_DESIGN_AGENT_INVOCATION_POLICY,
     publicValidator(),
   )
 }
@@ -46,7 +48,10 @@ function browserEvent(
   }
 }
 
-function sourceInspection(candidateId: 'a' | 'b' | 'c', targetUrl: string): unknown[] {
+function sourceInspection(
+  candidateId: 'a' | 'b' | 'c',
+  targetUrl: string,
+): unknown[] {
   return [
     browserEvent(candidateId, 'browser_navigate', targetUrl),
     browserEvent(candidateId, 'browser_snapshot', targetUrl),
@@ -94,6 +99,7 @@ test('explicit private targetUrl is rejected before the Director can inspect it'
     fake,
     [fake],
     {components: false, browser: true, conceptImages: false},
+    DEFAULT_WEB_DESIGN_AGENT_INVOCATION_POLICY,
     new WebDesignAgentBrowserTargetValidator(async () => ['10.0.0.9']),
   )
 
@@ -153,6 +159,7 @@ test('selected concept image URL is validated before concept-first generation', 
     fake,
     [fake],
     {components: false, browser: false, conceptImages: false},
+    DEFAULT_WEB_DESIGN_AGENT_INVOCATION_POLICY,
     new WebDesignAgentBrowserTargetValidator(async () => ['127.0.0.1']),
   )
 
@@ -171,6 +178,53 @@ test('selected concept image URL is validated before concept-first generation', 
     /private, loopback, link-local, metadata, reserved, or multicast/i,
   )
   assert.equal(fake.invokes.length, 0)
+})
+
+test('concept-first requires browser capability to inspect the selected concept image', async () => {
+  const fake = new FakeRuntime(JSON.stringify(generation()))
+
+  await assert.rejects(
+    () =>
+      runtime(fake, {
+        components: false,
+        browser: false,
+        conceptImages: false,
+      }).generate({
+        prompt: 'use this concept',
+        sourceMode: 'concept-first',
+        selectedConcept: {
+          id: 'A',
+          title: 'Concept',
+          thesis: 'Concept thesis',
+          imageUrl: PUBLIC_TARGET,
+        },
+      }),
+    /requires configured browser MCP capability/i,
+  )
+  assert.equal(fake.invokes.length, 0)
+})
+
+test('concept-first succeeds only when every candidate inspects the selected concept image', async () => {
+  const fake = new FakeRuntime(JSON.stringify(generation()))
+  fake.streamEvents.push([
+    ...sourceInspection('a', PUBLIC_TARGET),
+    ...sourceInspection('b', PUBLIC_TARGET),
+    ...sourceInspection('c', PUBLIC_TARGET),
+  ])
+
+  const result = await runtime(fake).generate({
+    prompt: 'use this concept',
+    sourceMode: 'concept-first',
+    selectedConcept: {
+      id: 'A',
+      title: 'Concept',
+      thesis: 'Concept thesis',
+      imageUrl: PUBLIC_TARGET,
+    },
+  })
+
+  assert.equal(result.validation.browserValidated, true)
+  assert.equal(result.intent.sourceMode, 'concept-first')
 })
 
 test('refinement cannot return a different candidate slot than requested', async () => {
