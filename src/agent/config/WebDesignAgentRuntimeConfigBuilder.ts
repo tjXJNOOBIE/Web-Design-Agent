@@ -44,6 +44,7 @@ interface WebDesignAgentRuntimeToolPolicy {
 export interface WebDesignAgentCapabilityData {
   readonly components: boolean
   readonly browser: boolean
+  readonly finalCandidatePreview?: boolean
   readonly conceptImages: boolean
 }
 
@@ -53,11 +54,17 @@ export class WebDesignAgentRuntimeConfigBuilder {
   ) {}
 
   public capabilities(): WebDesignAgentCapabilityData {
+    const browserUrl = this.optionalString(
+      this.environment['WEB_DESIGN_AGENT_BROWSER_MCP_URL'],
+    )
+    const localPlaywright =
+      browserUrl === undefined &&
+      this.optionalBoolean(this.environment['WEB_DESIGN_AGENT_ENABLE_PLAYWRIGHT'])
+
     return {
       components: this.optionalString(this.environment['API_KEY_21ST']) !== undefined,
-      browser:
-        this.optionalString(this.environment['WEB_DESIGN_AGENT_BROWSER_MCP_URL']) !== undefined ||
-        this.optionalBoolean(this.environment['WEB_DESIGN_AGENT_ENABLE_PLAYWRIGHT']),
+      browser: browserUrl !== undefined || localPlaywright,
+      finalCandidatePreview: localPlaywright,
       conceptImages: this.optionalBoolean(
         this.environment['WEB_DESIGN_AGENT_ENABLE_HIGGSFIELD'],
       ),
