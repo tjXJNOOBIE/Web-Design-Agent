@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
+import {DEFAULT_WEB_DESIGN_AGENT_INVOCATION_POLICY} from '../src/agent/config/WebDesignAgentRuntimeConfigBuilder.js'
 import {WebDesignAgentRuntime} from '../src/agent/runtime/WebDesignAgentRuntime.js'
+import {WebDesignAgentPreviewRuntime} from '../src/design/preview/WebDesignAgentPreviewRuntime.js'
 import {generation} from './fixture/DesignFixture.js'
 import {FakeRuntime} from './fake/FakeStrands.js'
+
+const PUBLIC_BASE_URL = 'https://design.example/'
 
 function browserInspectionEvents(
   candidateId: 'a' | 'b' | 'c',
@@ -37,7 +41,7 @@ function browserInspectionEvents(
 
 function previewUrl(prompt: string, candidateId: 'A' | 'B' | 'C'): string {
   const match = prompt.match(
-    new RegExp(`Candidate ${candidateId} final preview: (http[^\\n]+)`),
+    new RegExp(`Candidate ${candidateId} final preview: (https[^\\n]+)`),
   )
   assert.ok(match?.[1], `Missing final preview URL for candidate ${candidateId}.`)
   return match[1]
@@ -59,10 +63,8 @@ function finalPreviewEvents(prompt: string, wrongCandidate?: 'A' | 'B' | 'C'): u
   })
 }
 
-test('code-first validates only after exact final artifacts are content-addressed and inspected', async () => {
-  const strands = new FakeRuntime(JSON.stringify(generation()))
-  strands.streamEventFactory = (prompt) => finalPreviewEvents(prompt)
-  const agent = new WebDesignAgentRuntime(
+function buildAgent(strands: FakeRuntime, previewRuntime: WebDesignAgentPreviewRuntime) {
+  return new WebDesignAgentRuntime(
     strands,
     [strands],
     {
@@ -71,7 +73,20 @@ test('code-first validates only after exact final artifacts are content-addresse
       finalCandidatePreview: true,
       conceptImages: false,
     },
+    DEFAULT_WEB_DESIGN_AGENT_INVOCATION_POLICY,
+    undefined,
+    undefined,
+    undefined,
+    previewRuntime,
+    PUBLIC_BASE_URL,
   )
+}
+
+test('code-first validates only after exact final artifacts are content-addressed and inspected', async () => {
+  const strands = new FakeRuntime(JSON.stringify(generation()))
+  strands.streamEventFactory = (prompt) => finalPreviewEvents(prompt)
+  const previewRuntime = new WebDesignAgentPreviewRuntime()
+  const agent = buildAgent(strands, previewRuntime)
 
   try {
     const result = await agent.generate({prompt: 'make a portfolio'})
@@ -82,7 +97,7 @@ test('code-first validates only after exact final artifacts are content-addresse
     assert.ok(
       result.candidates.every((candidate) =>
         candidate.browserEvidence.some((evidence) =>
-          /127\.0\.0\.1:\d+\/candidate\/[abc]\/[a-f0-9]{64}/i.test(evidence),
+          /design\.example\/preview\/[A-Za-z0-9_-]{32}\/[abc]\/[a-f0-9]{64}/i.test(evidence),
         ),
       ),
     )
@@ -92,22 +107,15 @@ test('code-first validates only after exact final artifacts are content-addresse
     )
   } finally {
     await agent.close()
+    previewRuntime.close()
   }
 })
 
 test('wrong final preview target cannot certify the returned code-first candidate', async () => {
   const strands = new FakeRuntime(JSON.stringify(generation()))
   strands.streamEventFactory = (prompt) => finalPreviewEvents(prompt, 'C')
-  const agent = new WebDesignAgentRuntime(
-    strands,
-    [strands],
-    {
-      components: false,
-      browser: true,
-      finalCandidatePreview: true,
-      conceptImages: false,
-    },
-  )
+  const previewRuntime = new WebDesignAgentPreviewRuntime()
+  const agent = buildAgent(strands, previewRuntime)
 
   try {
     const result = await agent.generate({prompt: 'make a portfolio'})
@@ -115,9 +123,10 @@ test('wrong final preview target cannot certify the returned code-first candidat
     assert.equal(result.validation.browserValidated, false)
     assert.match(
       result.validation.notes.at(-1) ?? '',
-      /final content-addressed preview inspection.*candidate C/i,
+      /final render-bound content-addressed preview inspection.*candidate C/i,
     )
   } finally {
     await agent.close()
+    previewRuntime.close()
   }
 })
