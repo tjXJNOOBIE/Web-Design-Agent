@@ -1,40 +1,50 @@
 # Web Design Agent Progression
 
 > **Status:** Implementation tracker  
-> **Audited implementation head:** `7fbff58da150a17aa3e02994b9b49c0e5ea814e0`  
+> **Current audited source line:** security/budget hardening through the current `working/strands-agent-foundation` head  
+> **Last fully executed physical baseline:** `7fbff58da150a17aa3e02994b9b49c0e5ea814e0`  
 > **Authority:** Reports implementation/validation evidence only; product behavior is owned by `WEB_DESIGN_AGENT_FINAL_DRAFT.md`
 
 ## Summary
 
-Web Design Agent is physically validated across the renamed Strands dependency graph, public NoAuth MCP transport, production MCP App, clean packed-consumer installation, native Strands candidate/browser integration, and runtime-grounded browser evidence.
+Web Design Agent has moved beyond the original physical Strands/browser proof into a hardened public NoAuth product line. The current source adds SSRF defenses, source-bound browser evidence, provider/component evidence, public MCP capacity/input limits, native Strands invocation budgets, MCP disconnect cancellation, source-mode invariants, and stricter concept-first behavior.
 
 Strands Agents remains the actual agent framework. `@tjxjnoobie/strands-bridge` is thin shared lifecycle/integration glue only.
 
-The major change in this audited line is that browser validation no longer trusts model output. WDA consumes native Strands streaming lifecycle events, records successful candidate browser calls, overwrites model-authored browser evidence, and computes `browserValidated` from observed execution.
+The critical evidence rule is now stronger than the last physical baseline: model claims are never authoritative, browser inspection must be navigation-bound, source-dependent modes must inspect the exact validated source target, and code-first does not claim final browser validation until returned output is deterministically render-bound.
 
-## Implemented and validated
+## Current source implementation
 
-| Area | Status | Evidence |
-| --- | --- | --- |
-| Strands Director + A/B/C + Critic | Implemented + physical Strands evidence | native agents and agent-as-tool composition |
-| Thin `strands-bridge` boundary | Physically validated | `@tjxjnoobie/strands-bridge@0.1.0`, bridge head `69d27b147ee4f8bf0bfba43cbd0668a1ca4dd868` |
-| Typed Design Intent / Genome / Design System / Visual State | Implemented + tested | `src/design/data/` |
-| Deterministic A/B/C distance | Implemented + tested | `DesignDistanceEvaluator` |
-| Multi-page route enforcement | Implemented + tested | runtime route validation |
-| Native Strands MCP configuration | Implemented + tested | no loose external MCP config cast |
-| External MCP role ownership | Implemented + tested | Candidates: browser/components; Concept Artist: image provider; Director/Critic: no duplicates |
-| Runtime-grounded browser evidence | Implemented + tested | `WebDesignAgentToolEvidenceCollector` + streamed nested Strands events |
-| Existing-site/reference evidence gate | Implemented + tested | requires configured browser **and observed inspection** |
-| 21st configuration | Implemented | provider-backed call pending |
-| Playwright MCP fallback | Implemented + physically validated | official `@playwright/mcp@0.0.80`, 24 browser tools |
-| Higgsfield concept capability | Implemented configuration | separate connector-level real generation proven; WDA southbound path pending |
-| NoAuth `/mcp` | Physically validated | real MCP client, eight WDA tools, `authentication:none` |
-| MCP App production bundle | Physically validated | Vite single-file build, official AppBridge interaction smoke |
-| Live ABC controls | Browser validated | candidate/page switching, compare, live radius mutation, context handoff |
-| Clean consumer package | Physically validated | current WDA + renamed bridge + Strands 1.16.0 install/start/catalog |
-| Durable validation command | Implemented | `npm run check:durable` |
+| Area | Current source state |
+| --- | --- |
+| Strands Director + A/B/C + Critic | Implemented |
+| Thin `strands-bridge` boundary | Implemented; pinned to `69d27b147ee4f8bf0bfba43cbd0668a1ca4dd868` |
+| Typed design contracts / genomes / design systems | Implemented |
+| Deterministic A/B/C distance | Implemented |
+| Multi-page route enforcement | Implemented |
+| Native Strands MCP configuration | Implemented |
+| External MCP role ownership | Candidates: browser/components; Concept Artist: image; Director/Critic: no duplicates |
+| Runtime-grounded browser evidence | Implemented from native Strands lifecycle events |
+| Navigation-bound browser evidence | Implemented; failed navigation clears current target |
+| Existing-site/reference-image source binding | Implemented; exact validated source required for A/B/C |
+| Concept-first provider evidence | Implemented; successful `assets_*` event required |
+| Concept-first selected-image inspection | Implemented; A/B/C must inspect selected concept target |
+| Component research evidence | Implemented from successful candidate `components_*` events |
+| Code-first browser truthfulness | Browser activity retained, `browserValidated=false` until final candidate output is deterministic-render-bound |
+| Explicit browser SSRF validation | Implemented; public URL/DNS/address policy |
+| Hosted browser egress startup gate | Implemented; public HTTP browser capability requires isolated-egress declaration |
+| Public NoAuth HTTP limits | Implemented; concurrency, body size, receive/header timeout, safe errors, CORS |
+| Public MCP schema limits | Implemented for prompts, feedback, URLs, pages, candidate/profile fields |
+| Native Strands invocation budgets | Implemented; wall-clock + turn/output/total-token limits |
+| MCP disconnect cancellation | Implemented; MCP request signal propagated to Strands |
+| Pre-cancel short circuit | Implemented; cancelled request rejected before runtime construction |
+| Pinned model baseline | Implemented; deployment override retained |
+| Playwright MCP fallback | Implemented with isolated/headless/service-worker-blocking configuration |
+| NoAuth `/mcp` | Implemented |
+| MCP App review surface | Implemented |
+| Durable validation command | `npm run check:durable` |
 
-## Physical validation
+## Last physically executed baseline
 
 Against implementation head `7fbff58da150a17aa3e02994b9b49c0e5ea814e0` with Node `v22.23.2`:
 
@@ -51,58 +61,68 @@ real PNG screenshot                              PASS
 package dry-run                                  PASS
 ```
 
-### Browser evidence hardening
+A clean external npm consumer also verified WDA, the renamed bridge, real Strands 1.16.0, public package import, NoAuth startup, and all eight WDA tools. The production MCP App completed the official AppBridge handshake and browser interaction smoke.
 
-The audited runtime now uses `director.streamAgent()` for generation/refinement so nested specialist lifecycle events remain visible.
+These results remain evidence for that tested line only. They do **not** prove the later SSRF, source-binding, invocation-budget, request-cancellation, bounded-schema, concept-provider, or pre-cancel changes until the current head is executed again.
 
-`WebDesignAgentToolEvidenceCollector` records successful `browser_*` calls only when the event belongs to `web-design-agent-candidate-a`, `-b`, or `-c` and the tool result did not fail.
+## Current hardening details
 
-For final generation:
+### Browser target policy
 
-```text
-model browserValidated=true + no real calls      -> false
-model browserEvidence strings + no real calls    -> discarded
-failed browser_snapshot                           -> does not count
-A/B/C observed snapshot/screenshot                -> browserValidated=true
-existing/reference + missing observed evidence    -> generation rejected
-```
+Explicit browserable inputs are accepted only as validated public HTTP(S) targets. The validator rejects URL credentials, non-public ports, localhost/internal names, and any DNS result in private, loopback, link-local, metadata, reserved, or multicast ranges. Mixed public/private DNS answers fail closed.
 
-The model's validation notes are preserved only as `Agent note (unverified): ...`. Runtime evidence notes are added separately.
+Application validation is intentionally not represented as a complete network firewall. Public browser hosting also requires environment-enforced egress isolation because redirects, rebinding, clicks, and model-discovered destinations happen after request parsing.
 
-### Physical browser path
+### Browser evidence
 
-The checked-in browser integration initializes a real WDA candidate through `StrandsAgentRuntimeBootstrap`, opens the WDA-built Playwright MCP config, validates canonical browser tool names, navigates a real page, receives an accessibility snapshot, captures a PNG, and closes resources cleanly.
-
-A durable environment may supply:
-
-- `WEB_DESIGN_AGENT_PLAYWRIGHT_EXECUTABLE_PATH`;
-- `WEB_DESIGN_AGENT_PLAYWRIGHT_BROWSERS_PATH` / `PLAYWRIGHT_BROWSERS_PATH`;
-- `WEB_DESIGN_AGENT_PLAYWRIGHT_MCP_COMMAND`;
-- or a remote `WEB_DESIGN_AGENT_BROWSER_MCP_URL`.
-
-Browser provisioning is environment work, not per-request work.
-
-### Public MCP and package
-
-A clean external npm consumer has verified:
+Browser evidence is now target-aware:
 
 ```text
-@tjxjnoobie/web-design-agent@0.2.0              PASS
-@tjxjnoobie/strands-bridge@0.1.0               PASS
-@strands-agents/sdk@1.16.0                     PASS
-public package import                           PASS
-NoAuth HTTP startup                             PASS
-root authentication:none                       PASS
-all eight WDA tools                             PASS
+successful browser_navigate(target)
+-> current candidate target = target
+-> browser_snapshot / browser_take_screenshot
+-> runtime evidence bound to target
 ```
 
-### MCP App
+A failed later navigation clears the target.
 
-The production App has completed the official MCP Apps `AppBridge` handshake and verified A/B/C selection, route switching, three-way compare, live slider mutation, and `ui/update-model-context` handoff in Chromium.
+For existing-site, reference-image, and concept-first implementation, A/B/C must each inspect the exact validated source target.
 
-### Higgsfield
+For code-first, arbitrary browser activity no longer makes `browserValidated=true`. A deterministic final-output renderer is still required before WDA can prove that the returned HTML itself was inspected.
 
-One real website-concept image generation completed through the connected Higgsfield surface. This proves provider capability separately, not yet WDA Concept Artist orchestration through Strands.
+### Provider/tool evidence
+
+- successful `components_*` calls are attributed to their candidate;
+- failed component calls do not count;
+- concept generation requires a successful Concept Artist `assets_*` event;
+- model-provided image URLs without provider execution are rejected.
+
+### NoAuth resource controls
+
+The public server currently owns per-process concurrency, body-size and request/header receive limits, safe anonymous errors, protocol CORS headers, and observed cleanup. Public tool schemas bound expensive request fields before workflow execution.
+
+Global/per-source rate limiting remains a deployment/edge concern rather than an application-owned mutable map.
+
+### Native Strands execution controls
+
+Current defaults:
+
+```text
+invocation timeout      240,000 ms
+max turns               16
+max output tokens       60,000
+max total tokens        200,000
+```
+
+All are deployment-overridable. MCP request cancellation is combined with the WDA timeout through native AbortSignals and forwarded to Strands. Incomplete stop reasons are rejected rather than parsed as complete JSON.
+
+## GitHub/Codex fallback state
+
+GitHub remains the active SCM/review fallback while Tavall Cloud v2 is unavailable in this chat.
+
+Codex previously found and helped surface real P1/P2 issues around SSRF, evidence binding, CORS, cleanup, source inputs, and refinement identity; those review threads were addressed and resolved.
+
+The GitHub Codex review quota and subsequent coding-agent quota are currently exhausted. Therefore later current-head changes have been statically reconciled through GitHub but have **not** been executed by Codex. Do not reinterpret the absence of a new review as a green check.
 
 ## Durable DEVELOPMENT gate
 
@@ -119,22 +139,24 @@ It combines:
 3. physical native Strands + Playwright MCP browser integration;
 4. package dry-run.
 
-The durable Tavall `ubuntu` environment is the intended long-lived execution surface for final locks and provider-backed runs once its typed command namespace is exposed to this chat.
+The durable Tavall `ubuntu` environment remains the intended long-lived execution surface for the current-head rerun, exact dependency lock, network-isolation verification, and provider-backed quality work.
 
 ## Dependency locks
 
-The exact renamed dependency graph reproducibly generates npm lockfile v3. The lock should be committed from the durable DEVELOPMENT write surface rather than reconstructed through connector text.
+The renamed dependency graph reproducibly generated npm lockfile v3 during prior physical validation. The exact current lock should be generated and committed from the durable DEVELOPMENT write surface rather than reconstructed through connector text.
 
 ## Remaining promotion gates
 
-1. Commit exact WDA dependency lock; commit bridge lock if repository policy retains it.
-2. Run an authorized real model through Director -> Candidate A/B/C -> Critic.
-3. Run real 21st MCP through Strands with deployment-owned credentials.
-4. Prove a real model-led render -> inspect -> critique -> repair loop and observe `browserValidated=true` from runtime events.
-5. Prove the Concept Artist southbound image-provider path through Strands.
-6. Render the production MCP App in supported ChatGPT and Claude clients.
-7. Run the full vague-prompt corpus with real model/browser behavior and record one-shot quality.
+1. Rerun the **current** hardened head with `npm run check:durable` and commit its exact dependency lock.
+2. Verify the public browser egress network boundary on the real deployment surface.
+3. Add deterministic final-candidate rendering so code-first can earn real browser validation.
+4. Run an authorized real model through Director -> Candidate A/B/C -> Critic.
+5. Run real 21st MCP through Strands with deployment-owned credentials.
+6. Prove the real model-led render -> inspect -> critique -> repair loop.
+7. Prove the Concept Artist southbound image-provider path through Strands.
+8. Render the production MCP App in supported ChatGPT and Claude clients.
+9. Run the full vague-prompt corpus with real model/browser behavior and record one-shot quality.
 
 ## Promotion state
 
-PR #2 remains Draft. Package, Strands, MCP, App, and browser mechanics are no longer the primary risk. The remaining risk is the thing judges and users actually care about: whether the real model/tool loop produces excellent, distinctive websites from vague prompts.
+PR #2 remains Draft. The older line proved that the package, Strands, MCP, MCP App, and browser mechanics are physically real. The current line strengthens security, resource control, and evidence semantics, but must be physically rerun before those newer claims become promotion evidence.
