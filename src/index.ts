@@ -59,6 +59,7 @@ export {DesignDistanceEvaluator} from './design/validation/DesignDistanceEvaluat
 export {DesignGenerationResultParser} from './design/validation/DesignGenerationResultParser.js'
 export {DesignResultValidationError} from './design/validation/DesignResultValidationError.js'
 export {WebDesignAgentBrowserTargetValidator} from './design/validation/WebDesignAgentBrowserTargetValidator.js'
+export {WEB_DESIGN_AGENT_REQUEST_LIMITS} from './design/validation/WebDesignAgentRequestLimits.js'
 export {WebDesignAgentCliHandler} from './cli/WebDesignAgentCliHandler.js'
 export {WebDesignAgentCliInputError} from './cli/error/WebDesignAgentCliInputError.js'
 export {OneShotDesignEvaluationHandler} from './evaluation/handler/OneShotDesignEvaluationHandler.js'
