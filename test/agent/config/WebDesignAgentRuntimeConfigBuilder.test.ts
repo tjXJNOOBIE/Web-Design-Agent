@@ -46,7 +46,7 @@ test('configures official Playwright MCP as an opt-in browser capability', () =>
     '--headless',
     '--isolated',
   ])
-  assert.equal(servers['browser']?.prefix, 'browser')
+  assert.equal(servers['browser']?.prefix, undefined)
   assert.equal(servers['browser']?.continueOnError, false)
 })
 
@@ -61,7 +61,7 @@ test('prefers a deployment-provided browser MCP URL over local Playwright', () =
 
   assert.equal(servers['browser']?.url, 'https://browser.example/mcp')
   assert.equal(servers['browser']?.command, undefined)
-  assert.equal(servers['browser']?.prefix, 'browser')
+  assert.equal(servers['browser']?.prefix, undefined)
   assert.equal(servers['browser']?.continueOnError, false)
   assert.deepEqual(servers['browser']?.headers, {
     Authorization: 'Bearer test-token',
