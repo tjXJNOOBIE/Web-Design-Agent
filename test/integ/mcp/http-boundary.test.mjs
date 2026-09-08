@@ -1,0 +1,172 @@
+import assert from 'node:assert/strict'
+import { request as createHttpRequest } from 'node:http'
+import test from 'node:test'
+import { setTimeout as delay } from 'node:timers/promises'
+
+import { WebDesignMcpHttpServer } from '../../../dist/mcp/http/WebDesignMcpHttpServer.js'
+
+function unusedBuilder() {
+  return {
+    build() {
+      throw new Error('MCP builder should not be reached by this boundary test.')
+    },
+  }
+}
+
+async function withServer(port, limits, builder, operation) {
+  const server = new WebDesignMcpHttpServer(
+    builder,
+    '127.0.0.1',
+    port,
+    limits,
+  )
+  await server.start()
+
+  try {
+    await operation()
+  } finally {
+    await server.close()
+  }
+}
+
+test('rejects oversized anonymous MCP request bodies before building an agent runtime', async () => {
+  const port = 43130
+
+  await withServer(
+    port,
+    { maxRequestBodyBytes: 32 },
+    unusedBuilder(),
+    async () => {
+      const response = await fetch(`http://127.0.0.1:${port}/mcp`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ payload: 'x'.repeat(128) }),
+      })
+      const body = await response.json()
+
+      assert.equal(response.status, 413)
+      assert.equal(body.error.code, -32002)
+      assert.match(body.error.message, /exceeds 32 bytes/)
+    },
+  )
+})
+
+test('rejects malformed JSON before constructing the MCP server', async () => {
+  const port = 43131
+
+  await withServer(port, {}, unusedBuilder(), async () => {
+    const response = await fetch(`http://127.0.0.1:${port}/mcp`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{not-json',
+    })
+    const body = await response.json()
+
+    assert.equal(response.status, 400)
+    assert.equal(body.error.code, -32700)
+    assert.match(body.error.message, /invalid JSON/)
+  })
+})
+
+test('does not expose internal MCP construction errors to anonymous clients', async () => {
+  const port = 43132
+  const secret = 'provider-secret-should-never-cross-http-boundary'
+  const builder = {
+    build() {
+      return {
+        async connect() {
+          throw new Error(secret)
+        },
+        async close() {},
+      }
+    },
+  }
+
+  await withServer(port, {}, builder, async () => {
+    const response = await fetch(`http://127.0.0.1:${port}/mcp`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize' }),
+    })
+    const text = await response.text()
+    const body = JSON.parse(text)
+
+    assert.equal(response.status, 500)
+    assert.equal(body.error.code, -32603)
+    assert.equal(body.error.message, 'Internal Web Design Agent server error.')
+    assert.ok(!text.includes(secret))
+  })
+})
+
+test('returns 429 while the anonymous per-process concurrency slot is occupied', async () => {
+  const port = 43133
+
+  await withServer(
+    port,
+    { maxConcurrentRequests: 1, requestReceiveTimeoutMs: 5_000, headersTimeoutMs: 2_500 },
+    unusedBuilder(),
+    async () => {
+      const blocker = createHttpRequest({
+        hostname: '127.0.0.1',
+        port,
+        path: '/mcp',
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'content-length': '128',
+        },
+      })
+
+      const connected = new Promise((resolve, reject) => {
+        blocker.once('socket', (socket) => {
+          if (socket.readyState === 'open') {
+            resolve()
+            return
+          }
+          socket.once('connect', resolve)
+          socket.once('error', reject)
+        })
+        blocker.once('error', (error) => {
+          if (error.code !== 'ECONNRESET') reject(error)
+        })
+      })
+
+      blocker.write('{')
+      blocker.flushHeaders()
+      await connected
+      await delay(40)
+
+      try {
+        const response = await fetch(`http://127.0.0.1:${port}/mcp`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: '{}',
+        })
+        const body = await response.json()
+
+        assert.equal(response.status, 429)
+        assert.equal(response.headers.get('retry-after'), '5')
+        assert.equal(body.error.code, -32001)
+      } finally {
+        blocker.destroy()
+      }
+    },
+  )
+})
+
+test('preflight allows MCP protocol headers without introducing authentication', async () => {
+  const port = 43134
+
+  await withServer(port, {}, unusedBuilder(), async () => {
+    const response = await fetch(`http://127.0.0.1:${port}/mcp`, {
+      method: 'OPTIONS',
+    })
+    const allowHeaders = response.headers.get('access-control-allow-headers') ?? ''
+
+    assert.equal(response.status, 204)
+    assert.match(allowHeaders, /mcp-protocol-version/)
+    assert.match(allowHeaders, /mcp-method/)
+    assert.match(allowHeaders, /mcp-name/)
+    assert.equal(response.headers.get('access-control-allow-origin'), '*')
+  })
+})
