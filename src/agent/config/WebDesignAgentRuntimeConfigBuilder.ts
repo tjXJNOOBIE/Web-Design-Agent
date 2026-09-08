@@ -16,6 +16,20 @@ export type WebDesignAgentTool = ReturnType<IStrandsAgentRuntime['createAgentToo
 export const DEFAULT_WEB_DESIGN_AGENT_MODEL_ID =
   'global.anthropic.claude-sonnet-4-6'
 
+export interface WebDesignAgentInvocationPolicyData {
+  readonly timeoutMs: number
+  readonly maxTurns: number
+  readonly maxOutputTokens: number
+  readonly maxTotalTokens: number
+}
+
+export const DEFAULT_WEB_DESIGN_AGENT_INVOCATION_POLICY: WebDesignAgentInvocationPolicyData = {
+  timeoutMs: 240_000,
+  maxTurns: 16,
+  maxOutputTokens: 60_000,
+  maxTotalTokens: 200_000,
+}
+
 type WebDesignAgentMcpServerMap = Exclude<
   NonNullable<StrandsAgentRuntimeConfig['mcpServers']>,
   string
@@ -46,6 +60,27 @@ export class WebDesignAgentRuntimeConfigBuilder {
         this.optionalBoolean(this.environment['WEB_DESIGN_AGENT_ENABLE_PLAYWRIGHT']),
       conceptImages: this.optionalBoolean(
         this.environment['WEB_DESIGN_AGENT_ENABLE_HIGGSFIELD'],
+      ),
+    }
+  }
+
+  public invocationPolicy(): WebDesignAgentInvocationPolicyData {
+    return {
+      timeoutMs: this.positiveIntegerEnvironment(
+        'WEB_DESIGN_AGENT_INVOCATION_TIMEOUT_MS',
+        DEFAULT_WEB_DESIGN_AGENT_INVOCATION_POLICY.timeoutMs,
+      ),
+      maxTurns: this.positiveIntegerEnvironment(
+        'WEB_DESIGN_AGENT_MAX_TURNS',
+        DEFAULT_WEB_DESIGN_AGENT_INVOCATION_POLICY.maxTurns,
+      ),
+      maxOutputTokens: this.positiveIntegerEnvironment(
+        'WEB_DESIGN_AGENT_MAX_OUTPUT_TOKENS',
+        DEFAULT_WEB_DESIGN_AGENT_INVOCATION_POLICY.maxOutputTokens,
+      ),
+      maxTotalTokens: this.positiveIntegerEnvironment(
+        'WEB_DESIGN_AGENT_MAX_TOTAL_TOKENS',
+        DEFAULT_WEB_DESIGN_AGENT_INVOCATION_POLICY.maxTotalTokens,
       ),
     }
   }
@@ -203,6 +238,7 @@ export class WebDesignAgentRuntimeConfigBuilder {
         : [`--executable-path=${executablePath}`]),
       '--headless',
       '--isolated',
+      '--block-service-workers',
     ]
   }
 
@@ -239,6 +275,18 @@ export class WebDesignAgentRuntimeConfigBuilder {
       prefix: 'assets',
       continueOnError: false,
     }
+  }
+
+  private positiveIntegerEnvironment(key: string, fallback: number): number {
+    const value = this.optionalString(this.environment[key])
+    if (value === undefined) return fallback
+
+    const parsed = Number(value)
+    if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+      throw new RangeError(`${key} must be a positive integer.`)
+    }
+
+    return parsed
   }
 
   private optionalString(value: string | undefined): string | undefined {
