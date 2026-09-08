@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import {StrandsAgentRuntimeBootstrap} from '@tjxjnoobie/custom-strands-bridge'
+import {StrandsAgentRuntimeBootstrap} from '@tjxjnoobie/strands-bridge'
 import {WebDesignAgentRuntimeConfigBuilder} from '../agent/config/WebDesignAgentRuntimeConfigBuilder.js'
 import {WebDesignAgentRuntimeBuilder} from '../agent/runtime/WebDesignAgentRuntimeBuilder.js'
 import {WebDesignAgentWorkflowHandler} from '../design/handler/WebDesignAgentWorkflowHandler.js'
