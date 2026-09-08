@@ -22,7 +22,7 @@
     "serve:stdio":"node ./dist/mcp/main.js --stdio",
     "prepack":"npm run build"
   },
-  "dependencies": {"@modelcontextprotocol/ext-apps":"^1.7.5","@modelcontextprotocol/sdk":"^1.30.0","@tjxjnoobie/custom-strands-bridge":"github:tjXJNOOBIE/custom-strands-bridge#98e009f014b5a58a004ceb5de66bed8b064714fe","zod":"^4.1.13"},
+  "dependencies": {"@modelcontextprotocol/ext-apps":"^1.7.5","@modelcontextprotocol/sdk":"^1.30.0","@tjxjnoobie/strands-bridge":"github:tjXJNOOBIE/strands-bridge#69d27b147ee4f8bf0bfba43cbd0668a1ca4dd868","zod":"^4.1.13"},
   "devDependencies": {"@types/node":"^22.15.0","typescript":"^5.8.3","vite":"^7.1.0","vite-plugin-singlefile":"^2.3.3"},
   "license":"MIT","publishConfig":{"access":"public"},"sideEffects":false,
   "repository":{"type":"git","url":"git+https://github.com/tjXJNOOBIE/Web-Design-Agent.git"},"homepage":"https://github.com/tjXJNOOBIE/Web-Design-Agent#readme","bugs":{"url":"https://github.com/tjXJNOOBIE/Web-Design-Agent/issues"},
