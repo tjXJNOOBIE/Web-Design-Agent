@@ -46,6 +46,8 @@ MCP / CLI request
 
 The Design Director owns the main model/tool loop. Candidate specialists own implementation directions. The critic evaluates output without becoming a fourth implementation style. Optional concept-first generation is isolated behind its own specialist and external capability.
 
+The shared bridge has been physically validated against real `@strands-agents/sdk@1.16.0`, including native agent construction and a disposable real Strands + MCP integration flow.
+
 ## A/B/C contract
 
 A/B/C variants are required to differ structurally, not only cosmetically. Every candidate carries a typed Design Genome covering composition, navigation, hero strategy, typography, density, geometry, surface model, depth, motion, content rhythm, and imagery strategy.
@@ -78,6 +80,8 @@ The MCP App review surface supports:
 
 The generated implementation remains immutable while the review UI keeps temporary visual state separately. A model call happens only when the user asks the agent to reconcile those preferences into a new implementation.
 
+The production MCP App has been built as one 438.66 kB HTML resource and browser-tested under the official MCP Apps `AppBridge`. That smoke validated A/B/C selection, route switching, three-way compare, live visual-variable editing, and `ui/update-model-context` handoff.
+
 ## External design tools
 
 External capabilities are optional and environment-owned:
@@ -90,12 +94,19 @@ External capabilities are optional and environment-owned:
 
 Optional endpoint/auth overrides are available through the matching `WEB_DESIGN_AGENT_*` environment variables in `WebDesignAgentRuntimeConfigBuilder`.
 
+A real Higgsfield concept image has been generated through the connected external surface. The Web Design Agent's own southbound Higgsfield MCP/OAuth path through Strands remains an authenticated integration gate.
+
 ## Run
 
-After dependencies are installed and the shared bridge is available:
+After dependencies are installed:
 
 ```bash
-npm run build
+npm run check:real
+```
+
+Start HTTP MCP:
+
+```bash
 node dist/mcp/main.js
 ```
 
@@ -119,21 +130,33 @@ node dist/evaluation/main.js
 
 ## Current validation status
 
-Implementation commit `6490fb8e0ee3aaafa4e321bcf78f98ae813aeab0` passed local strict TypeScript, server build, and 17/17 delegate/product contract tests using local stubs only for true external package/runtime boundaries.
+Fresh Node `v22.23.2` physical validation currently passes:
 
-That is not physical Strands/MCP/browser/model validation. The following remain promotion gates:
+```text
+npm install                                 PASS
+npm run typecheck                           PASS
+npm test                                    PASS (17 / 17)
+npm run test:integ:mcp                      PASS (1 / 1)
+production Vite MCP App build               PASS
+npm pack --dry-run                          PASS
+clean consumer tarball install              PASS
+packed MCP startup + eight-tool negotiation PASS
+official AppBridge Chromium interaction     PASS
+```
 
-- real npm dependency installation and lockfile generation;
-- physical `@strands-agents/sdk` execution through the shared bridge;
-- real MCP SDK + MCP App production bundle;
-- authorized model invocation;
-- real 21st MCP call;
-- real browser render/screenshot/interaction evidence;
-- real Higgsfield concept generation when enabled;
-- clean consumer install/npx smoke test;
-- hosted ChatGPT/Claude MCP App rendering.
+The shared bridge separately passes its physical Strands 1.16.0 verification and native disposable Strands + MCP integration test.
 
-The Draft PR stays Draft until those claims have actual evidence. Computers already generate enough fiction without release notes joining in.
+The following remain promotion gates:
+
+- commit the reproducibly generated npm lockfile from the normal DEVELOPMENT environment;
+- authorized real Web Design Agent model generation;
+- authenticated 21st MCP use through the Strands runtime;
+- real southbound browser MCP render/critique/repair execution through the agent;
+- real southbound Higgsfield MCP/OAuth concept-first execution through the agent;
+- hosted ChatGPT and Claude MCP App rendering;
+- real vague-prompt one-shot quality measurements.
+
+PR #2 stays Draft until those claims have actual evidence. Computers already generate enough fiction without release notes joining in.
 
 ## License
 
