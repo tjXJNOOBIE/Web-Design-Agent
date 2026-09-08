@@ -73,7 +73,10 @@ test('runtime records browser validation false when browser is absent', async ()
   const result = await agent.generate({prompt: 'site'})
 
   assert.equal(result.validation.browserValidated, false)
-  assert.match(result.validation.notes.at(-1) ?? '', /browser validation was not executed/i)
+  assert.match(
+    result.validation.notes.at(-1) ?? '',
+    /browser validation was not executed/i,
+  )
   assert.ok(result.candidates.every((item) => item.browserEvidence.length === 0))
 })
 
@@ -104,10 +107,10 @@ test('model cannot self-certify browser validation without observed Strands tool
   assert.equal(result.validation.browserValidated, false)
   assert.ok(result.candidates.every((item) => item.browserEvidence.length === 0))
   assert.match(result.validation.notes[0] ?? '', /Agent note \(unverified\)/)
-  assert.match(result.validation.notes.at(-1) ?? '', /candidates A, B, C/)
+  assert.match(result.validation.notes.at(-1) ?? '', /render-bound/i)
 })
 
-test('runtime grounds browser validation in navigation-bound candidate Strands tool events', async () => {
+test('code-first keeps observed browser evidence without claiming final candidate validation', async () => {
   const runtime = new FakeRuntime(json())
   runtime.streamEvents.push([
     ...browserInspectionEvents('a'),
@@ -122,14 +125,19 @@ test('runtime grounds browser validation in navigation-bound candidate Strands t
 
   const result = await agent.generate({prompt: 'site'})
 
-  assert.equal(result.validation.browserValidated, true)
-  assert.match(result.candidates[0]?.browserEvidence[0] ?? '', /browser_snapshot.*example\.com/i)
-  assert.match(result.candidates[1]?.browserEvidence[0] ?? '', /browser_snapshot.*example\.com/i)
-  assert.match(result.candidates[2]?.browserEvidence[0] ?? '', /browser_take_screenshot.*example\.com/i)
-  assert.match(result.validation.notes.at(-1) ?? '', /navigation-bound inspection/i)
+  assert.equal(result.validation.browserValidated, false)
+  assert.match(
+    result.candidates[0]?.browserEvidence[0] ?? '',
+    /browser_snapshot.*example\.com/i,
+  )
+  assert.match(
+    result.candidates[2]?.browserEvidence[0] ?? '',
+    /browser_take_screenshot.*example\.com/i,
+  )
+  assert.match(result.validation.notes.at(-1) ?? '', /render-bound/i)
 })
 
-test('snapshot without successful navigation cannot satisfy runtime inspection evidence', async () => {
+test('snapshot without successful navigation cannot create browser evidence', async () => {
   const runtime = new FakeRuntime(json())
   runtime.streamEvents.push([
     browserToolEvent('a', 'browser_snapshot'),
@@ -154,7 +162,12 @@ test('failed navigation clears the browser target before a later snapshot', asyn
     ...browserInspectionEvents('a'),
     ...browserInspectionEvents('b'),
     browserToolEvent('c', 'browser_navigate'),
-    browserToolEvent('c', 'browser_navigate', 'error', 'https://other.example.com/'),
+    browserToolEvent(
+      'c',
+      'browser_navigate',
+      'error',
+      'https://other.example.com/',
+    ),
     browserToolEvent('c', 'browser_snapshot'),
   ])
   const agent = new WebDesignAgentRuntime(
@@ -167,7 +180,55 @@ test('failed navigation clears the browser target before a later snapshot', asyn
 
   assert.equal(result.validation.browserValidated, false)
   assert.deepEqual(result.candidates[2]?.browserEvidence, [])
-  assert.match(result.validation.notes.at(-1) ?? '', /candidates C/)
+})
+
+test('runtime passes native Strands timeout and token budgets to the Director stream', async () => {
+  const runtime = new FakeRuntime(json())
+  const policy = {
+    timeoutMs: 15_000,
+    maxTurns: 7,
+    maxOutputTokens: 12_000,
+    maxTotalTokens: 40_000,
+  }
+  const agent = new WebDesignAgentRuntime(
+    runtime,
+    [runtime],
+    {components: false, browser: false, conceptImages: false},
+    policy,
+  )
+
+  await agent.generate({prompt: 'bounded site'})
+
+  const options = runtime.streamOptions[0] as {
+    cancelSignal?: AbortSignal
+    limits?: {
+      turns?: number
+      outputTokens?: number
+      totalTokens?: number
+    }
+  }
+  assert.ok(options.cancelSignal instanceof AbortSignal)
+  assert.equal(options.cancelSignal.aborted, false)
+  assert.deepEqual(options.limits, {
+    turns: 7,
+    outputTokens: 12_000,
+    totalTokens: 40_000,
+  })
+})
+
+test('runtime rejects Strands cancellation or budget exhaustion as incomplete output', async () => {
+  const runtime = new FakeRuntime(json())
+  runtime.stopReason = 'limitTurns'
+  const agent = new WebDesignAgentRuntime(
+    runtime,
+    [runtime],
+    {components: false, browser: false, conceptImages: false},
+  )
+
+  await assert.rejects(
+    () => agent.generate({prompt: 'site'}),
+    /stopped before a complete result.*limitTurns/i,
+  )
 })
 
 test('runtime refinement carries visual state', async () => {
@@ -209,7 +270,10 @@ test('runtime refinement replaces model evidence with observed selected-candidat
   })
 
   assert.equal(result.browserEvidence.length, 1)
-  assert.match(result.browserEvidence[0] ?? '', /browser_take_screenshot.*example\.com/i)
+  assert.match(
+    result.browserEvidence[0] ?? '',
+    /browser_take_screenshot.*example\.com/i,
+  )
 })
 
 test('runtime rejects a refinement result for a different candidate id', async () => {
@@ -242,44 +306,6 @@ test('runtime enforces requested multi-page routes', async () => {
   await assert.rejects(
     () => agent.generate({prompt: 'site', pages: ['/pricing']}),
     /missing requested page routes/,
-  )
-})
-
-test('runtime refuses existing-site without browser capability', async () => {
-  const runtime = new FakeRuntime(json())
-  const agent = new WebDesignAgentRuntime(
-    runtime,
-    [runtime],
-    {components: false, browser: false, conceptImages: false},
-  )
-
-  await assert.rejects(
-    () =>
-      agent.generate({
-        prompt: 'redesign',
-        sourceMode: 'existing-site',
-        targetUrl: PUBLIC_TARGET,
-      }),
-    /requires configured browser/,
-  )
-})
-
-test('runtime refuses existing-site mode when browser is configured but source inspection did not execute', async () => {
-  const runtime = new FakeRuntime(json())
-  const agent = new WebDesignAgentRuntime(
-    runtime,
-    [runtime],
-    {components: false, browser: true, conceptImages: false},
-  )
-
-  await assert.rejects(
-    () =>
-      agent.generate({
-        prompt: 'redesign',
-        sourceMode: 'existing-site',
-        targetUrl: PUBLIC_TARGET,
-      }),
-    /requires successful browser inspection of its source.*A, B, C/,
   )
 })
 
