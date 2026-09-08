@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { WebDesignAgentRuntimeConfigBuilder } from '../../../src/agent/config/WebDesignAgentRuntimeConfigBuilder.js'
+import {
+  DEFAULT_WEB_DESIGN_AGENT_INVOCATION_POLICY,
+  WebDesignAgentRuntimeConfigBuilder,
+} from '../../../src/agent/config/WebDesignAgentRuntimeConfigBuilder.js'
 
 function serversFor(
   builder: WebDesignAgentRuntimeConfigBuilder,
@@ -19,17 +22,13 @@ function serversFor(
 
 test('uses native Strands prefix for component MCP tools', () => {
   const servers = serversFor(
-    new WebDesignAgentRuntimeConfigBuilder({
-      API_KEY_21ST: 'test-key',
-    }),
+    new WebDesignAgentRuntimeConfigBuilder({API_KEY_21ST: 'test-key'}),
   )
 
   assert.equal(servers['components']?.url, 'https://21st.dev/api/mcp')
   assert.equal(servers['components']?.prefix, 'components')
   assert.equal(servers['components']?.continueOnError, true)
-  assert.deepEqual(servers['components']?.headers, {
-    'x-api-key': 'test-key',
-  })
+  assert.deepEqual(servers['components']?.headers, {'x-api-key': 'test-key'})
 })
 
 test('configures official Playwright MCP as an opt-in browser capability', () => {
@@ -46,6 +45,7 @@ test('configures official Playwright MCP as an opt-in browser capability', () =>
     '--browser=chromium',
     '--headless',
     '--isolated',
+    '--block-service-workers',
   ])
   assert.equal(servers['browser']?.prefix, undefined)
   assert.equal(servers['browser']?.continueOnError, false)
@@ -92,6 +92,7 @@ test('uses an installed browser executable when the deployment provides one', ()
     '--executable-path=/opt/chromium/chrome',
     '--headless',
     '--isolated',
+    '--block-service-workers',
   ])
 })
 
@@ -146,4 +147,45 @@ test('scopes external MCP tools to the Strands agents that own them', () => {
 
   const conceptServers = serversFor(builder, 'concept')
   assert.deepEqual(Object.keys(conceptServers), ['higgsfield'])
+})
+
+test('provides bounded native Strands invocation defaults', () => {
+  assert.deepEqual(
+    new WebDesignAgentRuntimeConfigBuilder({}).invocationPolicy(),
+    DEFAULT_WEB_DESIGN_AGENT_INVOCATION_POLICY,
+  )
+})
+
+test('allows deployment to override native Strands invocation budgets', () => {
+  assert.deepEqual(
+    new WebDesignAgentRuntimeConfigBuilder({
+      WEB_DESIGN_AGENT_INVOCATION_TIMEOUT_MS: '90000',
+      WEB_DESIGN_AGENT_MAX_TURNS: '9',
+      WEB_DESIGN_AGENT_MAX_OUTPUT_TOKENS: '24000',
+      WEB_DESIGN_AGENT_MAX_TOTAL_TOKENS: '80000',
+    }).invocationPolicy(),
+    {
+      timeoutMs: 90_000,
+      maxTurns: 9,
+      maxOutputTokens: 24_000,
+      maxTotalTokens: 80_000,
+    },
+  )
+})
+
+test('rejects invalid native Strands invocation budgets', () => {
+  assert.throws(
+    () =>
+      new WebDesignAgentRuntimeConfigBuilder({
+        WEB_DESIGN_AGENT_MAX_TURNS: '0',
+      }).invocationPolicy(),
+    /WEB_DESIGN_AGENT_MAX_TURNS must be a positive integer/,
+  )
+  assert.throws(
+    () =>
+      new WebDesignAgentRuntimeConfigBuilder({
+        WEB_DESIGN_AGENT_INVOCATION_TIMEOUT_MS: 'not-a-number',
+      }).invocationPolicy(),
+    /WEB_DESIGN_AGENT_INVOCATION_TIMEOUT_MS must be a positive integer/,
+  )
 })
