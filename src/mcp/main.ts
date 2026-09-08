@@ -5,11 +5,13 @@ import {WebDesignAgentRuntimeConfigBuilder} from '../agent/config/WebDesignAgent
 import {WebDesignAgentRuntimeBuilder} from '../agent/runtime/WebDesignAgentRuntimeBuilder.js'
 import {WebDesignAgentWorkflowHandler} from '../design/handler/WebDesignAgentWorkflowHandler.js'
 import {WebDesignMcpHttpServer} from './http/WebDesignMcpHttpServer.js'
+import {WebDesignMcpPublicDeploymentValidator} from './http/WebDesignMcpPublicDeploymentValidator.js'
 import {WebDesignMcpServerBuilder} from './server/WebDesignMcpServerBuilder.js'
 import {WebDesignMcpStdioServer} from './stdio/WebDesignMcpStdioServer.js'
 
 const environment = process.env
 const config = new WebDesignAgentRuntimeConfigBuilder(environment)
+const capabilities = config.capabilities()
 const workflow = new WebDesignAgentWorkflowHandler(
   new WebDesignAgentRuntimeBuilder(
     new StrandsAgentRuntimeBootstrap(),
@@ -18,13 +20,18 @@ const workflow = new WebDesignAgentWorkflowHandler(
 )
 const builder = new WebDesignMcpServerBuilder(
   workflow,
-  config.capabilities(),
+  capabilities,
   environment,
 )
 
 if (process.argv.includes('--stdio')) {
   await new WebDesignMcpStdioServer(builder).start()
 } else {
+  new WebDesignMcpPublicDeploymentValidator().validate(
+    capabilities,
+    environment,
+  )
+
   const server = new WebDesignMcpHttpServer(
     builder,
     environment['WEB_DESIGN_AGENT_HOST'] ?? '0.0.0.0',
