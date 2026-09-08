@@ -135,7 +135,7 @@ test('failed browser calls cannot satisfy runtime inspection evidence', async ()
 
   assert.equal(result.validation.browserValidated, false)
   assert.deepEqual(result.candidates[2]?.browserEvidence, [])
-  assert.match(result.validation.notes.at(-1) ?? '', /candidate C/)
+  assert.match(result.validation.notes.at(-1) ?? '', /candidates C/)
 })
 
 test('runtime refinement carries visual state', async () => {
