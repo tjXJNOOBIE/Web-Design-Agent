@@ -1,9 +1,11 @@
 export type {
   WebDesignAgentCapabilityData,
   WebDesignAgentEnvironment,
+  WebDesignAgentInvocationPolicyData,
   WebDesignAgentTool,
 } from './agent/config/WebDesignAgentRuntimeConfigBuilder.js'
 export {
+  DEFAULT_WEB_DESIGN_AGENT_INVOCATION_POLICY,
   DEFAULT_WEB_DESIGN_AGENT_MODEL_ID,
   WebDesignAgentRuntimeConfigBuilder,
 } from './agent/config/WebDesignAgentRuntimeConfigBuilder.js'
@@ -56,6 +58,7 @@ export {WebDesignAgentWorkflowHandler} from './design/handler/WebDesignAgentWork
 export {DesignDistanceEvaluator} from './design/validation/DesignDistanceEvaluator.js'
 export {DesignGenerationResultParser} from './design/validation/DesignGenerationResultParser.js'
 export {DesignResultValidationError} from './design/validation/DesignResultValidationError.js'
+export {WebDesignAgentBrowserTargetValidator} from './design/validation/WebDesignAgentBrowserTargetValidator.js'
 export {WebDesignAgentCliHandler} from './cli/WebDesignAgentCliHandler.js'
 export {WebDesignAgentCliInputError} from './cli/error/WebDesignAgentCliInputError.js'
 export {OneShotDesignEvaluationHandler} from './evaluation/handler/OneShotDesignEvaluationHandler.js'
@@ -63,6 +66,7 @@ export type {OneShotDesignEvaluationData} from './evaluation/handler/OneShotDesi
 export {ONE_SHOT_DESIGN_PROMPT_CORPUS} from './evaluation/data/OneShotDesignPromptCorpus.js'
 export type {WebDesignMcpHttpServerLimits} from './mcp/http/WebDesignMcpHttpServer.js'
 export {WebDesignMcpHttpServer} from './mcp/http/WebDesignMcpHttpServer.js'
+export {WebDesignMcpPublicDeploymentValidator} from './mcp/server/WebDesignMcpPublicDeploymentValidator.js'
 export {
   WebDesignMcpServerBuilder,
   WEB_DESIGN_MCP_APP_RESOURCE_URI,
