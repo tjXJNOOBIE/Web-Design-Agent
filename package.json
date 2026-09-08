@@ -10,7 +10,7 @@
   "files": ["dist","README.md","LICENSE"],
   "engines": {"node": ">=22"},
   "scripts": {"build:server":"tsc -p tsconfig.build.json","build:app":"vite build","build":"npm run build:server && npm run build:app","typecheck":"tsc -p tsconfig.json --noEmit","test":"tsc -p tsconfig.test.json && node --test \".test-dist/test/**/*.test.js\"","check":"npm run typecheck && npm run test && npm run build","serve":"node ./dist/mcp/main.js","serve:stdio":"node ./dist/mcp/main.js --stdio","prepack":"npm run build"},
-  "dependencies": {"@modelcontextprotocol/ext-apps":"^1.7.5","@modelcontextprotocol/sdk":"^1.30.0","@tjxjnoobie/custom-strands-bridge":"github:tjXJNOOBIE/custom-strands-bridge#677f141a73fcc1bed23edf02c8fdfbd116fd034d","zod":"^4.1.13"},
+  "dependencies": {"@modelcontextprotocol/ext-apps":"^1.7.5","@modelcontextprotocol/sdk":"^1.30.0","@tjxjnoobie/custom-strands-bridge":"github:tjXJNOOBIE/custom-strands-bridge#98e009f014b5a58a004ceb5de66bed8b064714fe","zod":"^4.1.13"},
   "devDependencies": {"@types/node":"^22.15.0","typescript":"^5.8.3","vite":"^7.1.0","vite-plugin-singlefile":"^2.3.3"},
   "license":"MIT","publishConfig":{"access":"public"},"sideEffects":false,
   "repository":{"type":"git","url":"git+https://github.com/tjXJNOOBIE/Web-Design-Agent.git"},"homepage":"https://github.com/tjXJNOOBIE/Web-Design-Agent#readme","bugs":{"url":"https://github.com/tjXJNOOBIE/Web-Design-Agent/issues"},
