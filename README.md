@@ -1,14 +1,12 @@
 # Web Design Agent
 
-Web Design Agent is a Strands-powered web design product for turning vague prompts into three genuinely different, real website implementations, reviewing them inline, visually tuning them, and refining the selected direction.
-
-The product is built around a simple human flow:
+Web Design Agent is a Strands-powered web design product for turning a vague request into three genuinely different, real website implementations, reviewing them inline, visually tuning them, and refining the selected direction.
 
 ```text
 vague request
   -> infer product brief
   -> build structurally different A / B / C
-  -> render/review real implementations
+  -> inspect/review available evidence
   -> tune visual controls or give chat feedback
   -> refine selected candidate
   -> export real HTML/CSS/JS and reusable design-system evidence
@@ -16,19 +14,17 @@ vague request
 
 ## Product surfaces
 
-- Public stateless HTTP MCP endpoint at `/mcp` when `web-design-agent-mcp` is hosted.
+- Public stateless NoAuth HTTP MCP endpoint at `/mcp`.
 - Stdio MCP mode for local clients.
-- MCP App A/B/C review surface for hosts that support MCP Apps.
+- MCP App A/B/C review surface.
 - CLI generation through `web-design-agent`.
 - One-shot vague-prompt evaluation through `web-design-agent-eval`.
 
-The public HTTP MCP surface is intentionally **NoAuth**. Clients do not log in and do not supply Web Design Agent credentials. Each request constructs an isolated Web Design Agent runtime so anonymous clients do not share model/session state. Deployment-owned model keys or optional provider credentials are internal service capabilities, not client authentication requirements.
-
-The HTTP server also applies local defense-in-depth controls by default: four concurrent MCP requests per process, a 1 MiB request-body limit, a 30-second request receive timeout, a 15-second header timeout, and redacted unexpected-error responses. These are capacity/abuse controls, not authentication. Global or per-source rate limiting belongs at the deployment edge/shared infrastructure layer rather than in a feature-local in-memory map.
+Clients do not create WDA accounts or supply WDA credentials. Model/browser/component/image-provider credentials remain deployment-owned capabilities behind the service boundary.
 
 ## Strands architecture
 
-Strands is the agent framework and owns the model/tool loop. The product consumes the validated Strands baseline through the thin `@tjxjnoobie/strands-bridge` integration package; the bridge does not replace Strands or implement a second agent framework.
+Strands is the agent framework and owns the model/tool loop. WDA consumes the validated Strands baseline through the thin `@tjxjnoobie/strands-bridge` lifecycle/integration package; the bridge does not replace Strands.
 
 ```text
 MCP / CLI request
@@ -40,126 +36,151 @@ MCP / CLI request
      -> Visual Critic native Strands agent
      -> optional Concept Artist native Strands agent
      -> Design Director native Strands agent
-          with specialists exposed through native Strands agent-as-tool support
-  -> deterministic A/B/C validation
+          with specialists exposed through native agent-as-tool support
+  -> deterministic validation + runtime evidence
   -> typed result
   -> reverse-order lifecycle close
 ```
 
-The Design Director owns the main model/tool loop. Candidate specialists own implementation directions. The critic evaluates output without becoming a fourth implementation style. Optional concept-first generation is isolated behind its own specialist and external capability.
-
-The default model is pinned to `global.anthropic.claude-sonnet-4-6` instead of inheriting Strands' moving SDK default. Deployments may override it with `WEB_DESIGN_AGENT_MODEL_ID` without changing the shared bridge.
-
-The thin bridge is physically validated against real `@strands-agents/sdk@1.16.0`, including native agent construction and a disposable real Strands + MCP integration flow.
+The model baseline is pinned to `global.anthropic.claude-sonnet-4-6` instead of inheriting a moving SDK default. Deployments may override it with `WEB_DESIGN_AGENT_MODEL_ID`.
 
 ## A/B/C contract
 
-A/B/C variants are required to differ structurally, not only cosmetically. Every candidate carries a typed Design Genome covering composition, navigation, hero strategy, typography, density, geometry, surface model, depth, motion, content rhythm, and imagery strategy.
+A/B/C must differ structurally, not merely by colors. Every candidate carries a Design Genome covering composition, navigation, hero strategy, typography, density, geometry, surface model, depth, motion, content rhythm, and imagery strategy.
 
-`DesignDistanceEvaluator` checks all three candidate pairs. If a pair is too similar, the runtime permits one complete regeneration pass and then rejects the result if diversity still fails.
+`DesignDistanceEvaluator` scores every pair. One full regeneration attempt is permitted after deterministic diversity failure; the generation is rejected if the second set remains too similar.
 
-Every candidate also carries:
+Candidates include real HTML/CSS/optional JavaScript, optional additional page routes, a reusable design system, live visual-state defaults, critique notes, and runtime evidence.
 
-- real HTML/CSS/optional JavaScript;
-- optional additional page routes using the same design language;
-- design-system tokens, typography, reusable component names, and principles;
-- live visual-state defaults;
-- critique notes;
-- runtime-grounded browser evidence when browser tools actually executed.
+## Runtime-grounded evidence
 
-## Runtime-grounded browser evidence
+WDA does **not** trust the model to certify its own tool usage.
 
-Web Design Agent does **not** trust the model to certify that visual validation happened.
+Generation/refinement consume the native Strands event stream. `WebDesignAgentToolEvidenceCollector` records successful nested specialist tool calls.
 
-Generation and refinement consume the native Strands event stream. Successful candidate `browser_*` calls are observed from real nested Strands `AfterToolCallEvent` lifecycle events and converted into product evidence by `WebDesignAgentToolEvidenceCollector`.
+### Browser evidence
 
-Consequences:
+A successful candidate `browser_navigate` establishes its current inspected target. A failed later navigation clears it. `browser_snapshot` or `browser_take_screenshot` counts only when bound to a successful navigation target.
 
-- model-authored `validation.browserValidated` is ignored;
-- model-authored candidate `browserEvidence` is replaced;
+- model-authored `browserValidated` is ignored;
+- model-authored `browserEvidence` is replaced;
 - failed browser calls do not count;
-- `browserValidated` is true only when A, B, and C each have successful inspection evidence from `browser_snapshot` or `browser_take_screenshot`;
-- existing-site/reference-image work fails if the required real browser inspection was not observed, even when a browser capability was merely configured;
-- model-authored validation notes are retained only as explicitly unverified agent notes.
+- existing-site, reference-image, and concept-first implementation require A/B/C to inspect the exact validated source target;
+- code-first browser activity may be retained as evidence, but `browserValidated` remains false until final returned candidate HTML can be deterministically bound to a controlled render target.
 
-Configuring a browser is not evidence that anybody used it. Software has enough ceremonies already.
+A screenshot of some unrelated public website does not validate the site WDA returned. A sentence this obvious unfortunately needed code.
 
-## Live visual review
+### Component and concept-provider evidence
 
-The MCP App review surface supports:
+Successful `components_*` calls are attributed to the candidate that used component research.
 
-- A/B/C switching;
-- simultaneous comparison;
-- desktop, tablet, and mobile preview widths;
-- multi-page route switching;
-- density, spacing, radius, font scale, hero scale, contrast, depth, and motion controls;
-- immediate preview changes without a model round trip;
-- refinement from the exact visual-state snapshot plus optional chat feedback;
-- selected-candidate context handoff;
-- standalone export;
-- portable preference-profile generation.
+Concept exploration requires a successful Concept Artist `assets_*` provider call. Three plausible image URLs in model JSON without real provider execution are rejected.
 
-The generated implementation remains immutable while the review UI keeps temporary visual state separately. A model call happens only when the user asks the agent to reconcile those preferences into a new implementation.
+## NoAuth browser safety
 
-The production MCP App is one 438.66 kB HTML resource and has been browser-tested under the official MCP Apps `AppBridge`. That smoke validated A/B/C selection, route switching, three-way compare, live visual-variable editing, and `ui/update-model-context` handoff.
+Explicit browserable source URLs are validated **before Strands sees them**:
 
-## External design tools
+- HTTP(S) only;
+- no URL credentials;
+- public browser ports only;
+- localhost/internal names rejected;
+- DNS resolved before use;
+- private, loopback, link-local, metadata, reserved, multicast, or mixed public/private results rejected.
 
-External capabilities are optional and deployment-owned. Candidate agents receive component/browser capabilities; the Design Director receives its specialist-agent tools; the critic does not open its own browser process; the Concept Artist receives only the concept-image capability.
+That is not a complete SSRF boundary. Redirects, DNS rebinding, browser clicks, and model-discovered destinations happen after request parsing. Therefore a public NoAuth deployment with browser capability must also isolate browser egress from Tavall/control/private/metadata networks.
 
-| Capability | Configuration | Behavior |
-| --- | --- | --- |
-| Strands model | `WEB_DESIGN_AGENT_MODEL_ID` | Overrides the pinned default `global.anthropic.claude-sonnet-4-6` for Director, Candidates, Critic, and Concept Artist. |
-| 21st component research | `API_KEY_21ST` | Adds `https://21st.dev/api/mcp` with native Strands prefix `components`. Results are design inspiration; they do not force React/Tailwind into the target stack. |
-| Deployment browser MCP | `WEB_DESIGN_AGENT_BROWSER_MCP_URL` | Preferred browser path when supplied. Existing-site/reference modes reject when no browser capability exists. |
-| Local Playwright MCP | `WEB_DESIGN_AGENT_ENABLE_PLAYWRIGHT=true` | Uses official `@playwright/mcp@0.0.80` as a stdio MCP fallback. Browser tool names stay canonical, such as `browser_navigate`. |
-| Environment-owned browser executable | `WEB_DESIGN_AGENT_PLAYWRIGHT_EXECUTABLE_PATH` | Points Playwright MCP at an already-installed browser rather than downloading a browser per request. |
-| Environment-owned Playwright cache | `WEB_DESIGN_AGENT_PLAYWRIGHT_BROWSERS_PATH` or `PLAYWRIGHT_BROWSERS_PATH` | Passed explicitly into the MCP child because the MCP stdio transport intentionally inherits only a safe environment-variable subset. |
-| Higgsfield concept-first | `WEB_DESIGN_AGENT_ENABLE_HIGGSFIELD=true` | Adds `https://mcp.higgsfield.ai/mcp` to the Concept Artist. Provider authorization remains deployment-owned. Concept images are references, not implementation evidence. |
+WDA refuses public HTTP startup with browser capability unless the deployment declares that boundary with:
 
-The browser configuration is typed directly against the native Strands `McpServerConfig` surface. There is no loose product-level MCP config cast hiding stale field names.
+```text
+WEB_DESIGN_AGENT_PUBLIC_BROWSER_EGRESS_ISOLATED=true
+```
 
-A physical browser integration test has initialized a real browser-enabled candidate through `StrandsAgentRuntimeBootstrap`, loaded 24 Playwright MCP tools, navigated to a real page, returned a real accessibility snapshot, captured a real PNG screenshot, and closed the Strands/runtime resources cleanly.
+The declaration is a startup invariant, not a firewall. The deployment still has to enforce the actual network isolation.
 
-A real Higgsfield concept image has separately been generated through the connected external surface. The Web Design Agent's own southbound Higgsfield MCP path through Strands remains a provider-credential integration gate. That does not change the NoAuth client contract.
+## NoAuth resource controls
 
-## HTTP deployment controls
+The public service is account-free, not unbounded.
 
-The public HTTP server defaults are intentionally conservative and can be tuned without code changes:
+### HTTP defaults
 
 | Environment variable | Default | Meaning |
 | --- | ---: | --- |
-| `WEB_DESIGN_AGENT_MAX_CONCURRENT_REQUESTS` | `4` | Maximum in-flight `/mcp` requests in one WDA process. |
-| `WEB_DESIGN_AGENT_MAX_REQUEST_BODY_BYTES` | `1048576` | Maximum JSON request body size. |
-| `WEB_DESIGN_AGENT_REQUEST_RECEIVE_TIMEOUT_MS` | `30000` | Maximum time allowed for receiving an HTTP request body. |
-| `WEB_DESIGN_AGENT_HEADERS_TIMEOUT_MS` | `15000` | Maximum time allowed for receiving request headers. |
+| `WEB_DESIGN_AGENT_MAX_CONCURRENT_REQUESTS` | `4` | In-flight `/mcp` requests per process. |
+| `WEB_DESIGN_AGENT_MAX_REQUEST_BODY_BYTES` | `1048576` | Maximum JSON body. |
+| `WEB_DESIGN_AGENT_REQUEST_RECEIVE_TIMEOUT_MS` | `30000` | Request-body receive timeout. |
+| `WEB_DESIGN_AGENT_HEADERS_TIMEOUT_MS` | `15000` | Header receive timeout. |
 
-The server returns `429` with `Retry-After` when the local concurrency ceiling is occupied, `413` before runtime construction for oversized bodies, typed `400` responses for malformed JSON, and a generic `500` envelope for unexpected server failures so provider/internal exception text does not cross the anonymous boundary.
+The server returns bounded/safe 400/413/415/429 responses and redacts unexpected internal/provider exception text from anonymous 500 responses.
+
+Public MCP schemas separately bound prompts, feedback, URLs, page count/path lengths, candidate fields, design-system data, and preference-profile fields before expensive workflow execution.
+
+### Native Strands invocation defaults
+
+| Environment variable | Default |
+| --- | ---: |
+| `WEB_DESIGN_AGENT_INVOCATION_TIMEOUT_MS` | `240000` |
+| `WEB_DESIGN_AGENT_MAX_TURNS` | `16` |
+| `WEB_DESIGN_AGENT_MAX_OUTPUT_TOKENS` | `60000` |
+| `WEB_DESIGN_AGENT_MAX_TOTAL_TOKENS` | `200000` |
+
+WDA passes these through native Strands invocation limits. MCP request cancellation propagates into the same Strands `cancelSignal`, combined with the independent WDA wall-clock timeout. Requests already cancelled before workflow execution are rejected before runtime construction.
+
+Global/per-source throttling remains a deployment/edge responsibility rather than an application-owned mutable map.
+
+## External design tools
+
+External capabilities are optional and role-scoped.
+
+| Capability | Configuration | Behavior |
+| --- | --- | --- |
+| 21st component research | `API_KEY_21ST` | Candidate-only design/component research with native `components` prefix. |
+| Deployment browser MCP | `WEB_DESIGN_AGENT_BROWSER_MCP_URL` | Preferred browser path when supplied. |
+| Local Playwright MCP | `WEB_DESIGN_AGENT_ENABLE_PLAYWRIGHT=true` | Official `@playwright/mcp@0.0.80`, headless/isolated, service workers blocked. |
+| Browser executable | `WEB_DESIGN_AGENT_PLAYWRIGHT_EXECUTABLE_PATH` | Reuses an environment-installed browser. |
+| Playwright cache | `WEB_DESIGN_AGENT_PLAYWRIGHT_BROWSERS_PATH` or `PLAYWRIGHT_BROWSERS_PATH` | Passed explicitly to the MCP child. |
+| Higgsfield concept-first | `WEB_DESIGN_AGENT_ENABLE_HIGGSFIELD=true` | Concept Artist only; provider authorization remains deployment-owned. |
+
+Candidate agents receive component/browser capability. The Director receives specialist agent tools. The Critic does not open duplicate browser/component processes. The Concept Artist receives image capability only.
+
+## MCP App review
+
+The MCP App supports:
+
+- A/B/C switching and simultaneous comparison;
+- desktop/tablet/mobile preview widths;
+- multi-page route switching;
+- density, spacing, radius, font, hero, contrast, depth, and motion controls;
+- immediate local visual changes without a model round trip;
+- selected-candidate refinement;
+- design-system inspection;
+- context handoff;
+- standalone export;
+- concept-first selection.
+
+An earlier physical AppBridge smoke validated A/B/C selection, route switching, compare mode, live visual mutation, and `ui/update-model-context`.
 
 ## Run and validate
 
-Install dependencies and run the core physical gate:
+Core gate:
 
 ```bash
 npm run check:real
 ```
 
-For a durable DEVELOPMENT environment with an environment-owned browser executable, run the complete typed validation gate:
+Durable DEVELOPMENT gate with an environment-owned browser:
 
 ```bash
 WEB_DESIGN_AGENT_PLAYWRIGHT_EXECUTABLE_PATH=/path/to/chrome \
 npm run check:durable
 ```
 
-`check:durable` runs the core physical MCP gate, the physical Strands + Playwright MCP browser integration, and an npm package dry-run. Deployments using a non-default browser process command can set `WEB_DESIGN_AGENT_PLAYWRIGHT_MCP_COMMAND`.
-
-Start HTTP MCP:
+HTTP MCP:
 
 ```bash
 node dist/mcp/main.js
 ```
 
-Local stdio MCP:
+Stdio MCP:
 
 ```bash
 node dist/mcp/main.js --stdio
@@ -171,52 +192,42 @@ CLI:
 node dist/cli/main.js "make a competitive Minecraft PvP website"
 ```
 
-Evaluation corpus:
+## Validation status
 
-```bash
-node dist/evaluation/main.js
-```
-
-## Current validation status
-
-The most recent physical Node `v22.23.2` baseline before the GitHub-only fallback pass completed:
+The **last fully executed physical baseline** predates the newest SSRF, source-binding, invocation-budget, request-cancellation, bounded-schema, and pre-cancel commits. That earlier Node 22 line physically passed:
 
 ```text
-npm install                                      PASS
+real npm install                                 PASS
 @tjxjnoobie/strands-bridge@0.1.0                 PASS
 @strands-agents/sdk@1.16.0                       PASS
-npm run typecheck                                PASS
-npm test                                         PASS (30 / 30)
-npm run test:integ:mcp                           PASS (1 / 1)
-production Vite MCP App build                    PASS
-npm pack --dry-run                               PASS
-clean consumer tarball install                   PASS
-packed MCP startup + eight-tool negotiation      PASS
-official AppBridge Chromium interaction          PASS
-native Strands candidate + Playwright MCP init   PASS
-Playwright MCP browser tool catalog              PASS (24 tools)
-browser_navigate                                 PASS
-browser_snapshot                                 PASS
-browser_take_screenshot                          PASS
-runtime-grounded browser evidence tests          PASS
-model self-certification rejected                PASS
+strict TypeScript                                PASS
+then-current product/delegate suite              PASS (30 / 30)
+real HTTP MCP integration                        PASS
+production MCP App build                         PASS
+clean packed-consumer install/start              PASS
+native Strands + Playwright MCP                  PASS
+24 browser tools                                 PASS
+real navigate / snapshot / PNG                   PASS
+package dry-run                                  PASS
 ```
 
-The current GitHub fallback line additionally contains dedicated tests for dual operation/cleanup failure preservation, pinned-model override behavior, and anonymous HTTP guardrails. Those newer checks must be rerun on the durable DEVELOPMENT execution surface before their physical pass counts replace the baseline above.
+Those results remain evidence for the tested commit only. The current GitHub head contains additional security/resource/evidence tests and **must be rerun** through `npm run check:durable` before those newer changes are called physically verified.
 
-The clean external consumer receives `@tjxjnoobie/web-design-agent@0.2.0`, `@tjxjnoobie/strands-bridge@0.1.0`, and real Strands 1.16.0, then starts the NoAuth MCP binary and negotiates all eight WDA tools.
+GitHub/Codex helped surface earlier P1/P2 issues around SSRF, evidence binding, CORS, cleanup, source inputs, and refinement identity. Those threads were fixed and resolved. The current Codex review/coding allowance is exhausted, so no newer GitHub-bot execution is being claimed.
 
-The following remain promotion gates:
+## Remaining promotion gates
 
-- rerun the current GitHub head through `check:durable` and commit the reproducibly generated npm lockfile from the durable DEVELOPMENT environment;
-- authorized real Web Design Agent model generation through Director + candidate specialists;
-- real 21st MCP use through Strands with the deployment-owned API key;
-- use the now-proven browser capability and runtime evidence collector inside the real model-led render -> inspect -> critique -> repair loop;
-- real southbound Higgsfield MCP concept-first execution through the Concept Artist with deployment-owned provider authorization;
-- hosted ChatGPT and Claude MCP App rendering;
-- real vague-prompt one-shot quality measurements.
+- rerun the current hardened head on the durable Tavall DEVELOPMENT/ubuntu surface and commit the exact generated lockfile;
+- verify actual browser egress isolation in deployment;
+- add deterministic final-candidate render binding for code-first validation;
+- run an authorized real model through Director -> A/B/C -> Critic;
+- run real 21st MCP through Strands;
+- prove the real model-led render -> inspect -> critique -> repair flow;
+- prove WDA Concept Artist -> image-provider execution through Strands;
+- validate the production MCP App in supported ChatGPT and Claude hosts;
+- run the vague-prompt corpus and measure one-shot design quality.
 
-PR #2 stays Draft until those claims have actual evidence. Computers already generate enough fiction without release notes joining in.
+PR #2 remains Draft until those claims have evidence.
 
 ## License
 
