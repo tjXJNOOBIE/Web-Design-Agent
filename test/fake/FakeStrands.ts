@@ -10,6 +10,10 @@ export class FakeRuntime implements IStrandsAgentRuntime {
   public closeCalls = 0
   public results: string[] = []
   public streamEvents: unknown[][] = []
+  public streamEventFactory?: (
+    args: string,
+    invocationIndex: number,
+  ) => readonly unknown[]
   public stopReason: string = 'endTurn'
   private closed = false
 
@@ -29,9 +33,14 @@ export class FakeRuntime implements IStrandsAgentRuntime {
     args: any,
     options?: any,
   ): AsyncGenerator<any, any, undefined> {
-    this.invokes.push(String(args))
+    const prompt = String(args)
+    const invocationIndex = this.invokes.length
+    this.invokes.push(prompt)
     this.streamOptions.push(options)
-    const events = this.streamEvents.shift() ?? []
+    const events =
+      this.streamEvents.shift() ??
+      this.streamEventFactory?.(prompt, invocationIndex) ??
+      []
 
     for (const event of events) {
       yield event
