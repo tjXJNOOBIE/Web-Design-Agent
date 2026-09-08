@@ -3,6 +3,7 @@ import { request as createHttpRequest } from 'node:http'
 import test from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
 
+import { WebDesignAgentPreviewRuntime } from '../../../dist/design/preview/WebDesignAgentPreviewRuntime.js'
 import { WebDesignMcpHttpServer } from '../../../dist/mcp/http/WebDesignMcpHttpServer.js'
 
 function unusedBuilder() {
@@ -13,12 +14,13 @@ function unusedBuilder() {
   }
 }
 
-async function withServer(port, limits, builder, operation) {
+async function withServer(port, limits, builder, operation, previewRuntime) {
   const server = new WebDesignMcpHttpServer(
     builder,
     '127.0.0.1',
     port,
     limits,
+    previewRuntime,
   )
   await server.start()
 
@@ -26,6 +28,29 @@ async function withServer(port, limits, builder, operation) {
     await operation()
   } finally {
     await server.close()
+  }
+}
+
+function previewCandidate(id) {
+  return {
+    id,
+    title: `Candidate ${id}`,
+    document: {
+      html: `<main><h1>Candidate ${id}</h1></main>`,
+      css: 'body{margin:0}',
+      javascript: '',
+    },
+    pages: [],
+    visualState: {
+      density: 0.5,
+      spacingScale: 1,
+      radius: 8,
+      fontScale: 1,
+      heroScale: 1,
+      contrast: 1,
+      depth: 0.2,
+      motion: 0,
+    },
   }
 }
 
@@ -169,4 +194,37 @@ test('preflight allows MCP protocol headers without introducing authentication',
     assert.match(allowHeaders, /mcp-name/)
     assert.equal(response.headers.get('access-control-allow-origin'), '*')
   })
+})
+
+test('serves only active content-addressed preview publications through the WDA HTTP origin', async () => {
+  const port = 43135
+  const previewRuntime = new WebDesignAgentPreviewRuntime()
+  const publication = previewRuntime.publish(
+    [previewCandidate('A'), previewCandidate('B'), previewCandidate('C')],
+    `http://127.0.0.1:${port}/`,
+  )
+
+  await withServer(
+    port,
+    {},
+    unusedBuilder(),
+    async () => {
+      const active = await fetch(publication.targets.A.url)
+      const html = await active.text()
+
+      assert.equal(active.status, 200)
+      assert.match(html, /Candidate A/)
+      assert.equal(active.headers.get('cache-control'), 'no-store')
+      assert.match(
+        active.headers.get('content-security-policy') ?? '',
+        /connect-src 'none'/,
+      )
+
+      publication.close()
+
+      const released = await fetch(publication.targets.A.url)
+      assert.equal(released.status, 404)
+    },
+    previewRuntime,
+  )
 })
