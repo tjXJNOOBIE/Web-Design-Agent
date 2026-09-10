@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import {createServer} from 'node:net'
 import { request as createHttpRequest } from 'node:http'
 import test from 'node:test'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -12,6 +13,22 @@ function unusedBuilder() {
       throw new Error('MCP builder should not be reached by this boundary test.')
     },
   }
+}
+
+async function freePort() {
+  const probe = createServer()
+  await new Promise((resolve, reject) => {
+    probe.once('error', reject)
+    probe.listen(0, '127.0.0.1', resolve)
+  })
+  const address = probe.address()
+  await new Promise((resolve, reject) => {
+    probe.close((error) => (error ? reject(error) : resolve()))
+  })
+  if (address === null || typeof address === 'string') {
+    throw new Error('Ephemeral MCP test port was not assigned.')
+  }
+  return address.port
 }
 
 async function withServer(port, limits, builder, operation, previewRuntime) {
@@ -55,7 +72,7 @@ function previewCandidate(id) {
 }
 
 test('rejects oversized anonymous MCP request bodies before building an agent runtime', async () => {
-  const port = 43130
+  const port = await freePort()
 
   await withServer(
     port,
@@ -77,7 +94,7 @@ test('rejects oversized anonymous MCP request bodies before building an agent ru
 })
 
 test('rejects malformed JSON before constructing the MCP server', async () => {
-  const port = 43131
+  const port = await freePort()
 
   await withServer(port, {}, unusedBuilder(), async () => {
     const response = await fetch(`http://127.0.0.1:${port}/mcp`, {
@@ -94,7 +111,7 @@ test('rejects malformed JSON before constructing the MCP server', async () => {
 })
 
 test('does not expose internal MCP construction errors to anonymous clients', async () => {
-  const port = 43132
+  const port = await freePort()
   const secret = 'provider-secret-should-never-cross-http-boundary'
   const builder = {
     build() {
@@ -124,7 +141,7 @@ test('does not expose internal MCP construction errors to anonymous clients', as
 })
 
 test('returns 429 while the anonymous per-process concurrency slot is occupied', async () => {
-  const port = 43133
+  const port = await freePort()
 
   await withServer(
     port,
@@ -180,7 +197,7 @@ test('returns 429 while the anonymous per-process concurrency slot is occupied',
 })
 
 test('preflight allows MCP protocol headers without introducing authentication', async () => {
-  const port = 43134
+  const port = await freePort()
 
   await withServer(port, {}, unusedBuilder(), async () => {
     const response = await fetch(`http://127.0.0.1:${port}/mcp`, {
@@ -197,7 +214,7 @@ test('preflight allows MCP protocol headers without introducing authentication',
 })
 
 test('serves only active content-addressed preview publications through the WDA HTTP origin', async () => {
-  const port = 43135
+  const port = await freePort()
   const previewRuntime = new WebDesignAgentPreviewRuntime()
   const publication = previewRuntime.publish(
     [previewCandidate('A'), previewCandidate('B'), previewCandidate('C')],
