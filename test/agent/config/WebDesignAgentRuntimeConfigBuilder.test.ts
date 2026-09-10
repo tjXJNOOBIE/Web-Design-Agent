@@ -149,10 +149,14 @@ test('scopes external MCP tools to the Strands agents that own them', () => {
   assert.deepEqual(Object.keys(conceptServers), ['higgsfield'])
 })
 
-test('provides bounded native Strands invocation defaults', () => {
+test('provides an unlimited native Strands wall-clock default with bounded budgets', () => {
   assert.deepEqual(
     new WebDesignAgentRuntimeConfigBuilder({}).invocationPolicy(),
     DEFAULT_WEB_DESIGN_AGENT_INVOCATION_POLICY,
+  )
+  assert.equal(
+    new WebDesignAgentRuntimeConfigBuilder({}).invocationPolicy().timeoutMs,
+    0,
   )
 })
 

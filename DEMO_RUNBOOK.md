@@ -26,9 +26,9 @@ provider and is not represented by fixture output.
 The current head proves 75/75 deterministic tests, strict TypeScript, build,
 package install, local MCP negotiation, and real Playwright MCP. The shared
 bridge subscription smoke proves a native Strands model call. For a
-developer-owned unlimited run, set both
-`WEB_DESIGN_AGENT_INVOCATION_TIMEOUT_MS=0` and
-`STRANDS_BRIDGE_CODEX_TIMEOUT_MS=0`; caller cancellation and token/turn
-budgets remain active. Component/image
+developer-owned unlimited run, the defaults already leave both wall-clock
+windows unlimited. Set both variables to `0` explicitly if you want the
+capture environment to make that policy visible; caller cancellation and
+token/turn budgets remain active. Component/image
 providers, supported-host MCP App installation, public HTTPS deployment, and
 a real vague-prompt A/B/C/refine/export capture remain unverified.
