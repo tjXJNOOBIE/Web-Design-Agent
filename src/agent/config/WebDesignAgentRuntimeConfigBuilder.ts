@@ -24,7 +24,7 @@ export interface WebDesignAgentInvocationPolicyData {
 }
 
 export const DEFAULT_WEB_DESIGN_AGENT_INVOCATION_POLICY: WebDesignAgentInvocationPolicyData = {
-  timeoutMs: 240_000,
+  timeoutMs: 0,
   maxTurns: 16,
   maxOutputTokens: 60_000,
   maxTotalTokens: 200_000,

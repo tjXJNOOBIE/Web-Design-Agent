@@ -24,7 +24,7 @@ Clients do not create WDA accounts or supply WDA credentials. Model/browser/comp
 
 ## Strands architecture
 
-Strands is the agent framework and owns the model/tool loop. WDA consumes the validated Strands baseline through the thin `@tjxjnoobie/strands-bridge` lifecycle/integration package at merged bridge `main` commit `590a6a33ec3d39c03d4c59e560caf1c4e37c6976`; the bridge does not replace Strands.
+Strands is the agent framework and owns the model/tool loop. WDA consumes the validated Strands baseline through the thin `@tjxjnoobie/strands-bridge` lifecycle/integration package at bridge `main` commit `a3de4eb0fd784159e3fa8f52539aec350956b8df`; the bridge does not replace Strands.
 
 ```text
 MCP / CLI request
@@ -118,12 +118,12 @@ Public MCP schemas separately bound prompts, feedback, URLs, page count/path len
 
 | Environment variable | Default |
 | --- | ---: |
-| `WEB_DESIGN_AGENT_INVOCATION_TIMEOUT_MS` | `240000` (`0` = unlimited) |
+| `WEB_DESIGN_AGENT_INVOCATION_TIMEOUT_MS` | `0` (unlimited; positive values opt into a wall-clock cap) |
 | `WEB_DESIGN_AGENT_MAX_TURNS` | `16` |
 | `WEB_DESIGN_AGENT_MAX_OUTPUT_TOKENS` | `60000` |
 | `WEB_DESIGN_AGENT_MAX_TOTAL_TOKENS` | `200000` |
 
-WDA passes these through native Strands invocation limits. MCP request cancellation propagates into the same Strands `cancelSignal`; set the wall-clock timeout to `0` for an unlimited execution window. Requests already cancelled before workflow execution are rejected before runtime construction.
+WDA passes these through native Strands invocation limits. The default wall-clock window is unlimited. MCP request cancellation propagates into the same Strands `cancelSignal`; set a positive timeout only when a deployment deliberately wants a wall-clock cap. Requests already cancelled before workflow execution are rejected before runtime construction.
 
 Global/per-source throttling remains a deployment/edge responsibility rather than an application-owned mutable map.
 
@@ -194,7 +194,7 @@ WEB_DESIGN_AGENT_PLAYWRIGHT_EXECUTABLE_PATH=/usr/bin/chromium-browser \
 node dist/mcp/main.js
 ```
 
-The subscription-backed path is intended for a developer-owned local process. The shared bridge subscription smoke passes through native Strands. With both timeout variables set to `0`, the model and WDA wall-clock windows are unlimited; caller cancellation and token/turn budgets remain active. No subscription token is read or stored by WDA.
+The subscription-backed path is intended for a developer-owned local process. The shared bridge subscription smoke passes through native Strands. Both wall-clock windows are unlimited by default; setting `WEB_DESIGN_AGENT_INVOCATION_TIMEOUT_MS=0` and `STRANDS_BRIDGE_CODEX_TIMEOUT_MS=0` makes that policy explicit. Caller cancellation and token/turn budgets remain active. No subscription token is read or stored by WDA.
 
 Stdio MCP:
 
