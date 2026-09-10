@@ -8,7 +8,10 @@ export type WebDesignAgentDnsResolver = (
   hostname: string,
 ) => Promise<readonly string[]>
 
-const BLOCKED_NETWORKS = new BlockList()
+// Keep IPv4 and IPv6 policies separate. Node's BlockList treats an IPv4
+// address as matching the IPv4-mapped IPv6 range when both families share one
+// instance, which would reject every otherwise-public IPv4 DNS answer.
+const BLOCKED_IPV4_NETWORKS = new BlockList()
 
 for (const [network, prefix] of [
   ['0.0.0.0', 8],
@@ -27,8 +30,10 @@ for (const [network, prefix] of [
   ['224.0.0.0', 4],
   ['240.0.0.0', 4],
 ] as const) {
-  BLOCKED_NETWORKS.addSubnet(network, prefix, 'ipv4')
+  BLOCKED_IPV4_NETWORKS.addSubnet(network, prefix, 'ipv4')
 }
+
+const BLOCKED_IPV6_NETWORKS = new BlockList()
 
 for (const [network, prefix] of [
   ['::', 128],
@@ -44,7 +49,7 @@ for (const [network, prefix] of [
   ['fec0::', 10],
   ['ff00::', 8],
 ] as const) {
-  BLOCKED_NETWORKS.addSubnet(network, prefix, 'ipv6')
+  BLOCKED_IPV6_NETWORKS.addSubnet(network, prefix, 'ipv6')
 }
 
 const BLOCKED_HOSTNAMES = new Set([
@@ -168,8 +173,10 @@ export class WebDesignAgentBrowserTargetValidator {
     family: number,
     label: string,
   ): void {
-    const type = family === 4 ? 'ipv4' : 'ipv6'
-    if (BLOCKED_NETWORKS.check(address, type)) {
+    const blocked = family === 4
+      ? BLOCKED_IPV4_NETWORKS.check(address, 'ipv4')
+      : BLOCKED_IPV6_NETWORKS.check(address, 'ipv6')
+    if (blocked) {
       throw new DesignResultValidationError(
         `${label} must not resolve to a private, loopback, link-local, metadata, reserved, or multicast address.`,
       )

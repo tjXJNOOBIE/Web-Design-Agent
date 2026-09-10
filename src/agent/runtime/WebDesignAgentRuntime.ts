@@ -401,8 +401,11 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
         'Runtime evidence: the exact final A/B/C artifacts were render-bound to content-addressed public previews and successfully inspected with browser tooling.',
       )
     } else if (finalPreviewInspection !== undefined) {
+      const missing = missingFinalPreviewInspection.length === 1
+        ? `candidate ${missingFinalPreviewInspection[0]}`
+        : `candidates ${missingFinalPreviewInspection.join(', ')}`
       notes.push(
-        `Runtime evidence: final render-bound content-addressed preview inspection was not observed for candidates ${missingFinalPreviewInspection.join(', ')}; browserValidated remains false.`,
+        `Runtime evidence: final render-bound content-addressed preview inspection was not observed for ${missing}; browserValidated remains false.`,
       )
     } else if (observedBrowserInspection) {
       notes.push(

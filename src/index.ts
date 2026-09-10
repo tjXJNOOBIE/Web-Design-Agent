@@ -67,7 +67,7 @@ export type {OneShotDesignEvaluationData} from './evaluation/handler/OneShotDesi
 export {ONE_SHOT_DESIGN_PROMPT_CORPUS} from './evaluation/data/OneShotDesignPromptCorpus.js'
 export type {WebDesignMcpHttpServerLimits} from './mcp/http/WebDesignMcpHttpServer.js'
 export {WebDesignMcpHttpServer} from './mcp/http/WebDesignMcpHttpServer.js'
-export {WebDesignMcpPublicDeploymentValidator} from './mcp/server/WebDesignMcpPublicDeploymentValidator.js'
+export {WebDesignMcpPublicDeploymentValidator} from './mcp/http/WebDesignMcpPublicDeploymentValidator.js'
 export {
   WebDesignMcpServerBuilder,
   WEB_DESIGN_MCP_APP_RESOURCE_URI,

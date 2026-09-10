@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import {DEFAULT_WEB_DESIGN_AGENT_INVOCATION_POLICY} from '../src/agent/config/WebDesignAgentRuntimeConfigBuilder.js'
 import {WebDesignAgentRuntime} from '../src/agent/runtime/WebDesignAgentRuntime.js'
+import {WebDesignAgentBrowserTargetValidator} from '../src/design/validation/WebDesignAgentBrowserTargetValidator.js'
 import {WebDesignAgentPreviewRuntime} from '../src/design/preview/WebDesignAgentPreviewRuntime.js'
 import {generation} from './fixture/DesignFixture.js'
 import {FakeRuntime} from './fake/FakeStrands.js'
@@ -74,7 +75,7 @@ function buildAgent(strands: FakeRuntime, previewRuntime: WebDesignAgentPreviewR
       conceptImages: false,
     },
     DEFAULT_WEB_DESIGN_AGENT_INVOCATION_POLICY,
-    undefined,
+    new WebDesignAgentBrowserTargetValidator(async () => ['93.184.216.34']),
     undefined,
     undefined,
     previewRuntime,
