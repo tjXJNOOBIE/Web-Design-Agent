@@ -24,7 +24,7 @@ Clients do not create WDA accounts or supply WDA credentials. Model/browser/comp
 
 ## Strands architecture
 
-Strands is the agent framework and owns the model/tool loop. WDA consumes the validated Strands baseline through the thin `@tjxjnoobie/strands-bridge` lifecycle/integration package; the bridge does not replace Strands.
+Strands is the agent framework and owns the model/tool loop. WDA consumes the validated Strands baseline through the thin `@tjxjnoobie/strands-bridge` lifecycle/integration package at merged bridge `main` commit `590a6a33ec3d39c03d4c59e560caf1c4e37c6976`; the bridge does not replace Strands.
 
 ```text
 MCP / CLI request
