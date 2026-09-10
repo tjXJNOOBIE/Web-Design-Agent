@@ -194,7 +194,19 @@ node dist/cli/main.js "make a competitive Minecraft PvP website"
 
 ## Validation status
 
-The **last fully executed physical baseline** predates the newest SSRF, source-binding, invocation-budget, request-cancellation, bounded-schema, and pre-cancel commits. That earlier Node 22 line physically passed:
+On current head `f9149134f9cdf18db7b62f9f2caf18156fde6e1b`, the local/package
+gates now pass:
+
+```text
+strict TypeScript                                PASS
+deterministic product suite                     PASS (75 / 75)
+production build                                PASS
+real npm pack                                   PASS
+clean packed-consumer install/start             PASS
+consumer HTTP MCP initialize/tools/resources    PASS
+```
+
+The earlier fully executed physical baseline also passed:
 
 ```text
 real npm install                                 PASS
@@ -211,7 +223,11 @@ real navigate / snapshot / PNG                   PASS
 package dry-run                                  PASS
 ```
 
-Those results remain evidence for the tested commit only. The current GitHub head contains additional security/resource/evidence tests and **must be rerun** through `npm run check:durable` before those newer changes are called physically verified.
+The current exact-source Tavall environment was resolved, but its shared
+workspace provider currently returns `STALE_VERSION: developer workspace path
+is unavailable` during refresh. Therefore no Tavall-local durable run is
+claimed for this head; local/package evidence is kept separate from the
+missing durable/provider evidence.
 
 GitHub/Codex helped surface earlier P1/P2 issues around SSRF, evidence binding, CORS, cleanup, source inputs, and refinement identity. Those threads were fixed and resolved. The current Codex review/coding allowance is exhausted, so no newer GitHub-bot execution is being claimed.
 
