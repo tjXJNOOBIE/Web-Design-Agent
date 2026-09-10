@@ -192,7 +192,7 @@ WEB_DESIGN_AGENT_PLAYWRIGHT_EXECUTABLE_PATH=/usr/bin/chromium-browser \
 node dist/mcp/main.js
 ```
 
-The subscription-backed path is intended for a developer-owned local process. Large complete A/B/C generations can take longer than the default request window on a subscription model; increase `STRANDS_BRIDGE_CODEX_TIMEOUT_MS` and `WEB_DESIGN_AGENT_INVOCATION_TIMEOUT_MS` together when testing that path. No subscription token is read or stored by WDA.
+The subscription-backed path is intended for a developer-owned local process. The shared bridge subscription smoke passes through native Strands, but the complete WDA A/B/C workflow was attempted with a ten-minute bounded invocation and did not return a complete result; it is not claimed as physical model acceptance. No subscription token is read or stored by WDA.
 
 Stdio MCP:
 

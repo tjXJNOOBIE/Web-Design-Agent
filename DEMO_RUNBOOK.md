@@ -24,6 +24,9 @@ provider and is not represented by fixture output.
 ## Evidence boundary
 
 The current head proves 75/75 deterministic tests, strict TypeScript, build,
-package install, and local MCP negotiation. Real model, Playwright/component/
-image providers, supported-host MCP App installation, public HTTPS deployment,
-and a real vague-prompt A/B/C/refine/export capture remain external gates.
+package install, local MCP negotiation, and real Playwright MCP. The shared
+bridge subscription smoke proves a native Strands model call, but a complete
+WDA A/B/C generation was attempted with a ten-minute bound and did not return
+complete JSON; it is not claimed as model acceptance. Component/image
+providers, supported-host MCP App installation, public HTTPS deployment, and
+a real vague-prompt A/B/C/refine/export capture remain unverified.
