@@ -1,0 +1,17 @@
+flowchart LR
+  User[Human vague design request] --> MCP[Public NoAuth MCP]
+  MCP --> Director[Strands Design Director]
+  Director --> A[Strands Candidate A]
+  Director --> B[Strands Candidate B]
+  Director --> C[Strands Candidate C]
+  Director --> Critic[Strands Visual Critic]
+  A --> Tools[Typed browser / component / image MCP]
+  B --> Tools
+  C --> Tools
+  Critic --> Validate[Deterministic diversity and evidence validation]
+  Validate --> App[MCP App A/B/C review]
+  App --> Refine[Selected-candidate refinement]
+  Refine --> Export[Deterministic export]
+  Preview[Content-addressed preview] --> Validate
+  classDef boundary fill:#172554,stroke:#93c5fd,color:#fff;
+  class MCP,Validate,Preview boundary;
