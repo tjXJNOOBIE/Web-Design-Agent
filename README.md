@@ -42,7 +42,7 @@ MCP / CLI request
   -> reverse-order lifecycle close
 ```
 
-The model baseline is pinned to `global.anthropic.claude-sonnet-4-6` instead of inheriting a moving SDK default. Deployments may override it with `WEB_DESIGN_AGENT_MODEL_ID`.
+The model baseline is pinned to `global.anthropic.claude-sonnet-4-6` instead of inheriting a moving SDK default. Deployments may override it with `WEB_DESIGN_AGENT_MODEL_ID`. For a local developer with a ChatGPT subscription and no model API key, use `WEB_DESIGN_AGENT_MODEL_ID=codex-cli`; the shared bridge invokes the locally authenticated `codex` CLI as the model while native Strands remains the agent/tool loop. Run `codex login` once first. This subscription mode is local/user-owned and is not a hosted-service credential.
 
 ## A/B/C contract
 
@@ -179,6 +179,20 @@ HTTP MCP:
 ```bash
 node dist/mcp/main.js
 ```
+
+Local subscription-backed MCP:
+
+```bash
+npm run build
+WEB_DESIGN_AGENT_MODEL_ID=codex-cli \
+STRANDS_BRIDGE_CODEX_MODEL=gpt-5.5 \
+STRANDS_BRIDGE_CODEX_REASONING_EFFORT=low \
+WEB_DESIGN_AGENT_ENABLE_PLAYWRIGHT=true \
+WEB_DESIGN_AGENT_PLAYWRIGHT_EXECUTABLE_PATH=/usr/bin/chromium-browser \
+node dist/mcp/main.js
+```
+
+The subscription-backed path is intended for a developer-owned local process. Large complete A/B/C generations can take longer than the default request window on a subscription model; increase `STRANDS_BRIDGE_CODEX_TIMEOUT_MS` and `WEB_DESIGN_AGENT_INVOCATION_TIMEOUT_MS` together when testing that path. No subscription token is read or stored by WDA.
 
 Stdio MCP:
 
