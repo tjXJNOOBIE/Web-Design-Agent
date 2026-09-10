@@ -32,3 +32,7 @@ capture environment to make that policy visible; caller cancellation and
 token/turn budgets remain active. Component/image
 providers, supported-host MCP App installation, public HTTPS deployment, and
 a real vague-prompt A/B/C/refine/export capture remain unverified.
+
+When a machine exposes a wrapper and a separately installed logged-in Codex
+binary, set `STRANDS_BRIDGE_CODEX_COMMAND` to the absolute logged-in binary
+path. This keeps subscription authentication and cleanup behavior deterministic.
