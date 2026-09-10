@@ -296,12 +296,16 @@ export class WebDesignAgentRuntime implements IWebDesignAgentRuntime {
     cancelSignal?: AbortSignal,
   ): Promise<StreamedDirectorInvocationData> {
     const evidence = new WebDesignAgentToolEvidenceCollector()
-    const timeoutSignal = AbortSignal.timeout(this.invocationPolicy.timeoutMs)
+    const timeoutSignal = this.invocationPolicy.timeoutMs > 0
+      ? AbortSignal.timeout(this.invocationPolicy.timeoutMs)
+      : undefined
     const invocationSignal = cancelSignal === undefined
       ? timeoutSignal
-      : AbortSignal.any([cancelSignal, timeoutSignal])
+      : timeoutSignal === undefined
+        ? cancelSignal
+        : AbortSignal.any([cancelSignal, timeoutSignal])
     const stream = this.director.streamAgent(prompt, {
-      cancelSignal: invocationSignal,
+      ...(invocationSignal === undefined ? {} : {cancelSignal: invocationSignal}),
       limits: {
         turns: this.invocationPolicy.maxTurns,
         outputTokens: this.invocationPolicy.maxOutputTokens,

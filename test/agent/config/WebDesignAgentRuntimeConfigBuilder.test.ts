@@ -173,6 +173,15 @@ test('allows deployment to override native Strands invocation budgets', () => {
   )
 })
 
+test('allows an unlimited invocation wall-clock window', () => {
+  assert.equal(
+    new WebDesignAgentRuntimeConfigBuilder({
+      WEB_DESIGN_AGENT_INVOCATION_TIMEOUT_MS: '0',
+    }).invocationPolicy().timeoutMs,
+    0,
+  )
+})
+
 test('rejects invalid native Strands invocation budgets', () => {
   assert.throws(
     () =>
@@ -186,6 +195,6 @@ test('rejects invalid native Strands invocation budgets', () => {
       new WebDesignAgentRuntimeConfigBuilder({
         WEB_DESIGN_AGENT_INVOCATION_TIMEOUT_MS: 'not-a-number',
       }).invocationPolicy(),
-    /WEB_DESIGN_AGENT_INVOCATION_TIMEOUT_MS must be a positive integer/,
+    /WEB_DESIGN_AGENT_INVOCATION_TIMEOUT_MS must be a non-negative integer/,
   )
 })

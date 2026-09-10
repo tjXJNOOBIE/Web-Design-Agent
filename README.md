@@ -118,12 +118,12 @@ Public MCP schemas separately bound prompts, feedback, URLs, page count/path len
 
 | Environment variable | Default |
 | --- | ---: |
-| `WEB_DESIGN_AGENT_INVOCATION_TIMEOUT_MS` | `240000` |
+| `WEB_DESIGN_AGENT_INVOCATION_TIMEOUT_MS` | `240000` (`0` = unlimited) |
 | `WEB_DESIGN_AGENT_MAX_TURNS` | `16` |
 | `WEB_DESIGN_AGENT_MAX_OUTPUT_TOKENS` | `60000` |
 | `WEB_DESIGN_AGENT_MAX_TOTAL_TOKENS` | `200000` |
 
-WDA passes these through native Strands invocation limits. MCP request cancellation propagates into the same Strands `cancelSignal`, combined with the independent WDA wall-clock timeout. Requests already cancelled before workflow execution are rejected before runtime construction.
+WDA passes these through native Strands invocation limits. MCP request cancellation propagates into the same Strands `cancelSignal`; set the wall-clock timeout to `0` for an unlimited execution window. Requests already cancelled before workflow execution are rejected before runtime construction.
 
 Global/per-source throttling remains a deployment/edge responsibility rather than an application-owned mutable map.
 
@@ -187,12 +187,14 @@ npm run build
 WEB_DESIGN_AGENT_MODEL_ID=codex-cli \
 STRANDS_BRIDGE_CODEX_MODEL=gpt-5.5 \
 STRANDS_BRIDGE_CODEX_REASONING_EFFORT=low \
+WEB_DESIGN_AGENT_INVOCATION_TIMEOUT_MS=0 \
+STRANDS_BRIDGE_CODEX_TIMEOUT_MS=0 \
 WEB_DESIGN_AGENT_ENABLE_PLAYWRIGHT=true \
 WEB_DESIGN_AGENT_PLAYWRIGHT_EXECUTABLE_PATH=/usr/bin/chromium-browser \
 node dist/mcp/main.js
 ```
 
-The subscription-backed path is intended for a developer-owned local process. The shared bridge subscription smoke passes through native Strands, but the complete WDA A/B/C workflow was attempted with a ten-minute bounded invocation and did not return a complete result; it is not claimed as physical model acceptance. No subscription token is read or stored by WDA.
+The subscription-backed path is intended for a developer-owned local process. The shared bridge subscription smoke passes through native Strands. With both timeout variables set to `0`, the model and WDA wall-clock windows are unlimited; caller cancellation and token/turn budgets remain active. No subscription token is read or stored by WDA.
 
 Stdio MCP:
 
