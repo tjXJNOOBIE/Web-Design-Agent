@@ -72,7 +72,7 @@ export class WebDesignAgentRuntimeConfigBuilder {
 
   public invocationPolicy(): WebDesignAgentInvocationPolicyData {
     return {
-      timeoutMs: this.positiveIntegerEnvironment(
+      timeoutMs: this.nonnegativeIntegerEnvironment(
         'WEB_DESIGN_AGENT_INVOCATION_TIMEOUT_MS',
         DEFAULT_WEB_DESIGN_AGENT_INVOCATION_POLICY.timeoutMs,
       ),
@@ -290,6 +290,18 @@ export class WebDesignAgentRuntimeConfigBuilder {
     const parsed = Number(value)
     if (!Number.isSafeInteger(parsed) || parsed <= 0) {
       throw new RangeError(`${key} must be a positive integer.`)
+    }
+
+    return parsed
+  }
+
+  private nonnegativeIntegerEnvironment(key: string, fallback: number): number {
+    const value = this.optionalString(this.environment[key])
+    if (value === undefined) return fallback
+
+    const parsed = Number(value)
+    if (!Number.isSafeInteger(parsed) || parsed < 0) {
+      throw new RangeError(`${key} must be a non-negative integer; use 0 for unlimited.`)
     }
 
     return parsed
