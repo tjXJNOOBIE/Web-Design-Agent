@@ -1,0 +1,32 @@
+{
+  "name": "@tjxjnoobie/web-design-agent",
+  "version": "0.2.0",
+  "description": "A Strands-powered web design agent that produces, critiques, and refines genuinely distinct A/B/C website implementations.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {".": {"types": "./dist/index.d.ts", "import": "./dist/index.js"}},
+  "bin": {"web-design-agent":"./dist/cli/main.js","web-design-agent-mcp":"./dist/mcp/main.js","web-design-agent-eval":"./dist/evaluation/main.js"},
+  "files": ["dist","README.md","LICENSE"],
+  "engines": {"node": ">=22"},
+  "scripts": {
+    "build:server":"tsc -p tsconfig.build.json",
+    "build:app":"vite build",
+    "build":"npm run build:server && npm run build:app",
+    "typecheck":"tsc -p tsconfig.json --noEmit",
+    "test":"tsc -p tsconfig.test.json && node scripts/run-compiled-tests.mjs",
+    "test:integ:mcp":"npm run build && node --test test/integ/mcp/*.test.mjs",
+    "test:integ:browser":"npm run build:server && node --test test/integ/browser/*.test.mjs",
+    "check":"npm run typecheck && npm run test && npm run build",
+    "check:real":"npm run typecheck && npm run test && npm run test:integ:mcp",
+    "check:durable":"npm run check:real && npm run test:integ:browser && npm pack --dry-run --ignore-scripts",
+    "serve":"node ./dist/mcp/main.js",
+    "serve:stdio":"node ./dist/mcp/main.js --stdio",
+    "prepack":"npm run build"
+  },
+  "dependencies": {"@modelcontextprotocol/ext-apps":"^1.7.5","@modelcontextprotocol/sdk":"^1.30.0","@tjxjnoobie/strands-bridge":"github:tjXJNOOBIE/strands-bridge#a00b123e6328df95b0dab7f2f79b251277c67796","zod":"^4.1.13"},
+  "devDependencies": {"@types/node":"^22.15.0","typescript":"^5.8.3","vite":"^7.1.0","vite-plugin-singlefile":"^2.3.3"},
+  "license":"MIT","publishConfig":{"access":"public"},"sideEffects":false,
+  "repository":{"type":"git","url":"git+https://github.com/tjXJNOOBIE/Web-Design-Agent.git"},"homepage":"https://github.com/tjXJNOOBIE/Web-Design-Agent#readme","bugs":{"url":"https://github.com/tjXJNOOBIE/Web-Design-Agent/issues"},
+  "keywords":["strands-agents","agents","mcp","mcp-apps","web-design-agent","abc-testing"]
+}
