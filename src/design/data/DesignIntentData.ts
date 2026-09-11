@@ -1,2 +1,0 @@
-export type DesignSourceMode='code-first'|'concept-first'|'reference-image'|'existing-site'
-export interface DesignIntentData{readonly product:string;readonly audience:readonly string[];readonly primaryGoal:string;readonly secondaryGoals:readonly string[];readonly contentHierarchy:readonly string[];readonly visualConstraints:readonly string[];readonly interactionRequirements:readonly string[];readonly responsiveRequirements:readonly string[];readonly sourceMode:DesignSourceMode}
