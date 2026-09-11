@@ -2,20 +2,15 @@
 
 `Web-Design-Agent` owns the Web Design Agent product. The authoritative backend/control architecture is Java. Shared provider-neutral AI execution and Java MCP capability publication belong in `TavallStudios/function-catalog`. Native Strands lifecycle/model-tool reasoning and native agent-as-tool composition belong in the standalone `tjXJNOOBIE/strands-bridge` MCP runtime service.
 
-Browser-side MCP App assets and other genuine frontend code may remain TypeScript/Vite. TypeScript must not own product backend policy, MCP/control orchestration, design workflow authority, provider authorization, or durable/runtime infrastructure once its Java replacement is validated.
+Browser-side MCP App assets and other genuine frontend code may remain TypeScript/Vite. TypeScript must not own product backend policy, MCP/control orchestration, design workflow authority, provider authorization, CLI/evaluation orchestration, or durable/runtime infrastructure.
 
 ## Authoritative engineering guidance
 
-Before changing code, architecture, tests, packaging, lifecycle, or documentation, read the current versions of **all** shared Tavall quality documents in `TavallStudios/tavall-docs`, including:
-
-- [`CODE_ARCHITECTURE.md`](https://github.com/TavallStudios/tavall-docs/blob/main/docs/quality/CODE_ARCHITECTURE.md)
-- [`DOCUMENTATION_STANDARDS.md`](https://github.com/TavallStudios/tavall-docs/blob/main/docs/quality/DOCUMENTATION_STANDARDS.md)
-- [`GIT_WORKFLOW.md`](https://github.com/TavallStudios/tavall-docs/blob/main/docs/quality/GIT_WORKFLOW.md)
-- every active chapter under [`docs/quality/code-architecture/`](https://github.com/TavallStudios/tavall-docs/tree/main/docs/quality/code-architecture), including `APPLICATION_OWNED_MUTABLE_MAPS.md`.
+Before changing code, architecture, tests, packaging, lifecycle, or documentation, read the current versions of all shared Tavall quality documents in `TavallStudios/tavall-docs`, including `CODE_ARCHITECTURE.md`, `DOCUMENTATION_STANDARDS.md`, `GIT_WORKFLOW.md`, and every active chapter under `docs/quality/code-architecture/`.
 
 `CODE_ARCHITECTURE.md` wins if a detailed chapter conflicts with it. Repository-local rules may strengthen those documents but must not silently weaken them.
 
-Use `TavallStudios/Tavall-Architecture-Tests` as the canonical executable architecture-test source. During the current migration, CI may consume the active executable consumer implementation from PR #6 until it is promoted and released.
+Use `TavallStudios/Tavall-Architecture-Tests` as the canonical executable architecture-test source. CI must consume the active canonical implementation rather than copying architecture checks into this repository.
 
 ## Product architecture
 
@@ -24,31 +19,34 @@ ChatGPT / Claude / CLI / MCP clients
     -> Web Design Agent Java NoAuth product boundary
         -> Java design workflow / validation / evidence / export authority
         -> Java-owned role and capability policy
-        -> standalone strands-bridge over MCP
-            -> Candidate A native Strands session
-            -> Candidate B native Strands session
-            -> Candidate C native Strands session
-            -> Visual Critic native Strands session
-            -> optional Concept Artist native Strands session
-            -> Director native Strands session
-                 -> specialists via native Strands agent-as-tool
-            -> role-scoped external MCP clients
+        -> Tavall Function Catalog / AIAgentRuntime
+            -> standalone strands-bridge over MCP
+                -> Candidate A native Strands session
+                -> Candidate B native Strands session
+                -> Candidate C native Strands session
+                -> Visual Critic native Strands session
+                -> optional Concept Artist native Strands session
+                -> Design Director native Strands session
+                     -> specialists via native Strands agent-as-tool
+                -> role-scoped external MCP clients
         -> browser-side MCP App / review UI assets
 ```
 
 **Java owns the application and specialist topology. Strands owns native reasoning and agent-as-tool execution. MCP joins them.**
 
-Java decides which specialist roles exist, their product prompts/policies, what external capability each role may receive, invocation budgets, result/evidence validation, and cleanup ownership. The bridge resolves Java-supplied session references to native Strands `createAgentTool()` capabilities; Java must not recreate the Strands tool loop or agent-as-tool protocol.
+Java decides which specialist roles exist, their product prompts/policies, what external capability each role may receive, invocation budgets, result/evidence validation, transport publication, and cleanup ownership. The bridge resolves Java-supplied session references to native Strands capabilities; Java must not recreate the Strands tool loop or agent-as-tool protocol.
+
+HTTP and stdio MCP are transport projections over the same Java Function Catalog surface. Do not create separate transport-specific tool registries or schemas.
 
 ## Product boundaries
 
-- Product Java code must not depend on `@strands-agents/sdk` or embed/import the npm `strands-bridge` package.
-- Use the Function Catalog Java Strands client/provider boundary to invoke the standalone bridge service.
+- Product Java code must not depend directly on `@strands-agents/sdk` or embed/import the npm `strands-bridge` package.
+- Use the Function Catalog Java Strands provider/client boundary to invoke the standalone bridge service.
 - `strands-bridge` must not own Web Design Agent product policy, A/B/C rules, evidence truth, source validation, design result validation, NoAuth policy, export behavior, or frontend state.
-- Do not recreate `tavall-di`, Tavall Cache, Registry, Database, Concurrency, EventBus, Scheduler, or other Java-owned systems in TypeScript.
-- Existing TypeScript backend code is migration/reference behavior until a corresponding Java slice has physical parity evidence. Port first; retire backend ownership afterward. Genuine browser-side frontend code may remain TypeScript.
-- Product prompts, permissions, tool exposure, workflows, user-facing policy, source validation, evidence classification, and design result validation belong here.
-- The public HTTP MCP product endpoint is **NoAuth**. Clients do not log in or provide Web Design Agent credentials. Deployment-owned model/provider credentials are internal capabilities, not client authentication.
+- Do not recreate `tavall-di`, Tavall Cache, Registry, Database, Concurrency, EventBus, Scheduler, Function Catalog, or other Java-owned systems in TypeScript.
+- TypeScript in this repository is browser-only under `src/mcp-app`. Do not add a second Node/TypeScript product backend, CLI, evaluator, or MCP server.
+- Product prompts, permissions, tool exposure, workflows, user-facing policy, source validation, evidence classification, and design result validation belong in Java here.
+- The public HTTP MCP product endpoint is NoAuth. Clients do not log in or provide Web Design Agent credentials. Deployment-owned model/provider credentials are internal capabilities, not client authentication.
 - NoAuth never means unrestricted network reach. A public HTTP deployment that exposes browser capability must fail closed unless browser execution is isolated from private, loopback, link-local, metadata, service-control, and internal Tavall networks.
 - Explicit browserable source inputs must be validated before Strands invocation: HTTP(S) only, safe public ports, no URL credentials, and no private/reserved/internal DNS or address targets. Application URL checks supplement rather than replace deployment egress isolation because redirects and DNS rebinding exist.
 - Rate limits, concurrency limits, request-size limits, and compute/resource ceilings are abuse controls and must not be described as authentication.
@@ -70,18 +68,35 @@ Java decides which specialist roles exist, their product prompts/policies, what 
 - Existing-site/reference-image modes fail when their required inspection capability is unavailable.
 - Code-first final-candidate preview validation must remain bound to runtime-owned content-addressed previews rather than model-chosen substitute URLs.
 - 21st/component tooling is inspiration/pattern research and must not force a frontend framework onto an implementation that does not use it.
-- Preserve accepted/rejected design evidence and validate responsive/accessibility behavior as those systems are migrated.
+- Preserve accepted/rejected design evidence and validate responsive/accessibility behavior when those systems are touched.
+
+## Public MCP contract
+
+- `design` exposes only `code-first`, `reference-image`, and `existing-site` source modes.
+- Concept-first remains a two-step interactive flow: `create-design-concepts` followed by `design-from-concept`.
+- Preserve the eight-tool public surface and MCP App resource contract unless a deliberate versioned product change says otherwise.
+- Preserve both structured `{kind,data}` responses and the compatibility text projection expected by existing clients.
+- Enum schemas must publish their actual Jackson/wire values rather than Java constant names.
 
 ## Tests and validation
 
-- Use delegate-style tests against real product classes and production-equivalent Tavall DI composition for managed Java behavior.
+- Use delegate-style tests against real product classes and production-equivalent Tavall DI/composition for managed Java behavior.
 - Fake only true external boundaries such as the standalone bridge, MCP endpoints, model providers, DNS resolution, browser/provider services, filesystem/export destinations, or cloud services.
-- Never report a TypeScript bridge shim, schema-only check, or mocked runtime as physical Strands validation.
+- Never report a schema-only check, mocked provider, or fake bridge as physical Strands validation.
 - `check` must consume the canonical Tavall architecture-test plugin/modules that apply to this repository.
-- The Java migration CI must validate the full shared Function Catalog provider and standalone bridge before validating Web Design Agent.
-- Require a physical Java -> standalone Strands MCP -> native specialist agent-as-tool composition check before declaring the Java specialist graph complete.
-- Preserve deterministic request/result/evidence tests from the TypeScript implementation as executable migration specifications.
+- CI must validate the shared Function Catalog provider and standalone bridge before validating Web Design Agent.
+- Require a physical Java -> standalone Strands MCP -> native specialist agent-as-tool composition check before declaring the specialist graph complete.
+- Require a real Java MCP client -> Java Streamable HTTP server smoke test for public transport/schema/resource compatibility.
+- Typecheck the browser-only MCP App separately; Vite transpilation is not a substitute for TypeScript checking.
+- Validate all installed Java distribution commands: HTTP MCP, stdio MCP, CLI, and evaluator.
 - Record exactly which checks ran and keep migration PRs Draft while required external/runtime evidence is unavailable.
+
+## Source layout
+
+- `src/main/java` — authoritative product/backend implementation.
+- `src/test/java` — authoritative Java product/transport/integration tests.
+- `src/mcp-app` — browser-only TypeScript/Vite MCP App.
+- Do not restore the retired `src/agent`, `src/design`, `src/mcp`, `src/cli`, `src/evaluation`, root `test/`, or Node product launcher trees.
 
 ## Git
 
