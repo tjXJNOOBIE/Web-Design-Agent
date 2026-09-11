@@ -29,6 +29,9 @@ import java.util.Objects;
 public final class WebDesignMcpRuntimeBuilder {
     private static final int DEFAULT_PORT = 3001;
     private static final int DEFAULT_MAX_CONCURRENT_REQUESTS = 4;
+    private static final int DEFAULT_MAX_REQUEST_BODY_BYTES = 1_048_576;
+    private static final int DEFAULT_REQUEST_RECEIVE_TIMEOUT_MILLIS = 30_000;
+    private static final int DEFAULT_HEADERS_TIMEOUT_MILLIS = 15_000;
 
     private final Map<String, String> environment;
 
@@ -48,11 +51,28 @@ public final class WebDesignMcpRuntimeBuilder {
                 "WEB_DESIGN_AGENT_MAX_CONCURRENT_REQUESTS",
                 DEFAULT_MAX_CONCURRENT_REQUESTS
         );
+        int maximumRequestBodyBytes = positiveInteger(
+                "WEB_DESIGN_AGENT_MAX_REQUEST_BODY_BYTES",
+                DEFAULT_MAX_REQUEST_BODY_BYTES
+        );
+        int requestReceiveTimeoutMillis = positiveInteger(
+                "WEB_DESIGN_AGENT_REQUEST_RECEIVE_TIMEOUT_MS",
+                DEFAULT_REQUEST_RECEIVE_TIMEOUT_MILLIS
+        );
+        int headersTimeoutMillis = positiveInteger(
+                "WEB_DESIGN_AGENT_HEADERS_TIMEOUT_MS",
+                DEFAULT_HEADERS_TIMEOUT_MILLIS
+        );
+        if (headersTimeoutMillis > requestReceiveTimeoutMillis) {
+            throw new IllegalArgumentException(
+                    "WEB_DESIGN_AGENT_HEADERS_TIMEOUT_MS must not exceed WEB_DESIGN_AGENT_REQUEST_RECEIVE_TIMEOUT_MS"
+            );
+        }
+
         WebDesignAgentPreviewRuntime previewRuntime = capabilities.browser()
                 ? new WebDesignAgentPreviewRuntime(maximumConcurrentRequests)
                 : null;
         String publicBaseUrl = optional("WEB_DESIGN_AGENT_PUBLIC_BASE_URL");
-
         WebDesignStrandsConfigurationResolver strandsConfigurationResolver =
                 new WebDesignStrandsConfigurationResolver(environment);
         WebDesignGenerationRequestResolver requestResolver = new WebDesignGenerationRequestResolver(
@@ -103,18 +123,31 @@ public final class WebDesignMcpRuntimeBuilder {
         AIFunctionCatalog catalog = new AIFunctionCatalog(objectMapper);
         catalog.registerInstances(functions);
         WebDesignMcpAppResource appResource = WebDesignMcpAppResource.fromClasspath(resourceDomains());
+        Map<String, String> connectorProperties = Map.of(
+                "connectionTimeout", Integer.toString(headersTimeoutMillis),
+                "connectionUploadTimeout", Integer.toString(requestReceiveTimeoutMillis),
+                "disableUploadTimeout", "false",
+                "maxPostSize", Integer.toString(maximumRequestBodyBytes),
+                "maxSwallowSize", Integer.toString(maximumRequestBodyBytes)
+        );
         AIFunctionMcpStandaloneHttpServer.Configuration serverConfiguration =
                 new AIFunctionMcpStandaloneHttpServer.Configuration(
                         optionalOrDefault("WEB_DESIGN_AGENT_HOST", "0.0.0.0"),
-                        positiveInteger("WEB_DESIGN_AGENT_PORT", DEFAULT_PORT),
+                        port(),
                         "",
                         "/mcp",
                         "web-design-agent",
                         "0.2.0",
-                        "Generate, compare, refine, inspect, and export real A/B/C web designs."
+                        "Generate, compare, refine, inspect, and export real A/B/C web designs.",
+                        connectorProperties
                 );
 
         List<AIFunctionMcpStandaloneHttpServer.ServletRegistration> supplementalServlets = new ArrayList<>();
+        supplementalServlets.add(new AIFunctionMcpStandaloneHttpServer.ServletRegistration(
+                "webDesignStatus",
+                new WebDesignStatusServlet(),
+                List.of("/")
+        ));
         if (previewRuntime != null) {
             supplementalServlets.add(new AIFunctionMcpStandaloneHttpServer.ServletRegistration(
                     "webDesignFinalPreview",
@@ -122,6 +155,13 @@ public final class WebDesignMcpRuntimeBuilder {
                     List.of("/preview/*")
             ));
         }
+        List<AIFunctionMcpStandaloneHttpServer.FilterRegistration> filters = List.of(
+                new AIFunctionMcpStandaloneHttpServer.FilterRegistration(
+                        "webDesignAnonymousMcpGuard",
+                        new WebDesignMcpRequestGuardFilter(maximumConcurrentRequests, maximumRequestBodyBytes),
+                        List.of("/mcp", "/mcp/*")
+                )
+        );
 
         try {
             AIFunctionMcpStandaloneHttpServer server = AIFunctionMcpStandaloneHttpServer.start(
@@ -130,7 +170,8 @@ public final class WebDesignMcpRuntimeBuilder {
                     List.of(appResource.specification()),
                     List.of(),
                     toolPresentations(),
-                    supplementalServlets
+                    supplementalServlets,
+                    filters
             );
             return new WebDesignMcpRuntime(server, previewRuntime);
         } catch (RuntimeException exception) {
@@ -171,6 +212,14 @@ public final class WebDesignMcpRuntimeBuilder {
                 .toList();
     }
 
+    private int port() {
+        int configuredPort = positiveInteger("WEB_DESIGN_AGENT_PORT", DEFAULT_PORT);
+        if (configuredPort > 65_535) {
+            throw new IllegalArgumentException("WEB_DESIGN_AGENT_PORT must be between 1 and 65535");
+        }
+        return configuredPort;
+    }
+
     private int positiveInteger(String name, int fallback) {
         String configured = optional(name);
         if (configured == null) {
@@ -178,7 +227,7 @@ public final class WebDesignMcpRuntimeBuilder {
         }
         try {
             int parsed = Integer.parseInt(configured);
-            if (parsed <= 0 || parsed > 65_535 && "WEB_DESIGN_AGENT_PORT".equals(name)) {
+            if (parsed <= 0) {
                 throw new NumberFormatException();
             }
             return parsed;
