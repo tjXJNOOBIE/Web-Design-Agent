@@ -55,12 +55,11 @@ public final class WebDesignMcpAppResource {
                 .name("abc-review-ui")
                 .description("Interactive A/B/C review UI for Web Design Agent results")
                 .mimeType(MIME_TYPE)
-                .meta(meta)
                 .build();
         return new SyncResourceSpecification(
                 resource,
                 (exchange, request) -> new McpSchema.ReadResourceResult(
-                        List.of(new McpSchema.TextResourceContents(RESOURCE_URI, MIME_TYPE, document)),
+                        List.of(new McpSchema.TextResourceContents(RESOURCE_URI, MIME_TYPE, document, meta)),
                         null
                 )
         );
