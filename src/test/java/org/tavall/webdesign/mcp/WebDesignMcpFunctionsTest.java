@@ -25,7 +25,6 @@ import org.tavall.webdesign.design.validation.WebDesignInvocationResultValidator
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -136,14 +135,23 @@ class WebDesignMcpFunctionsTest {
 
     private static DesignCandidate candidate() {
         DesignGenome genome = new DesignGenome(
-                "editorial", "top", "split", "serif", "sharp", "flat", "subtle", "dense", "photo", 0.5, 0.2
+                "editorial",
+                "top",
+                "split",
+                "serif",
+                0.5,
+                "sharp",
+                "flat",
+                0.2,
+                "subtle",
+                "dense",
+                "photo"
         );
         DesignSystem designSystem = new DesignSystem(
-                Map.of("background", "#fff"),
-                Map.of("body", "system-ui"),
-                Map.of("md", "16px"),
-                Map.of("card", "8px"),
-                List.of("button")
+                List.of(new DesignSystem.Token("background", "#fff")),
+                List.of(new DesignSystem.Typography("body", "system-ui", "400")),
+                List.of("button"),
+                List.of("clear hierarchy")
         );
         VisualState visualState = new VisualState(0.5, 1.0, 8.0, 1.0, 1.0, 1.0, 0.2, 0.2);
         return new DesignCandidate(
