@@ -22,9 +22,15 @@ import java.util.Objects;
 /** Builds the shared Java-owned Web Design Agent application graph from environment policy. */
 public final class WebDesignApplicationServicesBuilder {
     private final Map<String, String> environment;
+    private final WebDesignAgentRoleConfigurationBuilder roleConfigurationBuilder;
 
     public WebDesignApplicationServicesBuilder(Map<String, String> environment) {
         this.environment = Map.copyOf(Objects.requireNonNull(environment, "environment"));
+        this.roleConfigurationBuilder = new WebDesignAgentRoleConfigurationBuilder(this.environment);
+    }
+
+    public WebDesignAgentRoleConfigurationBuilder.WebDesignAgentCapabilities capabilities() {
+        return roleConfigurationBuilder.capabilities();
     }
 
     public WebDesignApplicationServices build() {
@@ -36,8 +42,6 @@ public final class WebDesignApplicationServicesBuilder {
             String previewBaseUrl
     ) {
         ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
-        WebDesignAgentRoleConfigurationBuilder roleConfigurationBuilder =
-                new WebDesignAgentRoleConfigurationBuilder(environment);
         WebDesignStrandsConfigurationResolver strandsConfigurationResolver =
                 new WebDesignStrandsConfigurationResolver(environment);
         DesignGenerationResultParser parser = new DesignGenerationResultParser(objectMapper);
@@ -46,10 +50,10 @@ public final class WebDesignApplicationServicesBuilder {
                 strandsConfigurationResolver,
                 roleConfigurationBuilder,
                 new WebDesignGenerationRequestResolver(new WebDesignAgentBrowserTargetValidator()),
-                new WebDesignGenerationPromptBuilder(objectMapper, roleConfigurationBuilder.capabilities()),
+                new WebDesignGenerationPromptBuilder(objectMapper, capabilities()),
                 parser,
                 new DesignDistanceEvaluator(),
-                new WebDesignGenerationEvidenceResolver(roleConfigurationBuilder.capabilities()),
+                new WebDesignGenerationEvidenceResolver(capabilities()),
                 invocationValidator,
                 previewRuntime,
                 previewBaseUrl
