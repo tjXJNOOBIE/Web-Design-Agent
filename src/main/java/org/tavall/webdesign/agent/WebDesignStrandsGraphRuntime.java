@@ -3,6 +3,8 @@ package org.tavall.webdesign.agent;
 import org.tavall.ai.agent.strands.StrandsAgentProviderConfiguration;
 import org.tavall.ai.agent.strands.StrandsAgentToolReference;
 import org.tavall.ai.agent.strands.StrandsBridgeMcpClient;
+import org.tavall.ai.agent.strands.StrandsInvocationLimits;
+import org.tavall.ai.agent.strands.StrandsObservedInvocationResult;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -95,6 +97,21 @@ public final class WebDesignStrandsGraphRuntime implements AutoCloseable {
     public String invokeDirector(String input) {
         ensureUsable();
         return bridgeClient.invokeAgent(DIRECTOR_ID, Objects.requireNonNull(input, "input"));
+    }
+
+    public StrandsObservedInvocationResult invokeDirectorObserved(String input) {
+        ensureUsable();
+        WebDesignAgentRoleConfigurationBuilder.WebDesignInvocationPolicy policy =
+                roleConfigurationBuilder.invocationPolicy();
+        return bridgeClient.invokeAgentObserved(
+                DIRECTOR_ID,
+                Objects.requireNonNull(input, "input"),
+                new StrandsInvocationLimits(
+                        policy.maxTurns(),
+                        policy.maxOutputTokens(),
+                        policy.maxTotalTokens()
+                )
+        );
     }
 
     public void cancelDirector() {
