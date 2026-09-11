@@ -48,7 +48,11 @@ public final class WebDesignAgentPreviewRuntime implements AutoCloseable {
     private final Map<String, List<String>> publicationPaths = new LinkedHashMap<>();
 
     public WebDesignAgentPreviewRuntime() {
-        this(4, 2_000_000, new DesignExportBuilder(), new ObjectMapper(), new SecureRandom());
+        this(4);
+    }
+
+    public WebDesignAgentPreviewRuntime(int maximumActivePublications) {
+        this(maximumActivePublications, 2_000_000, new DesignExportBuilder(), new ObjectMapper(), new SecureRandom());
     }
 
     WebDesignAgentPreviewRuntime(
