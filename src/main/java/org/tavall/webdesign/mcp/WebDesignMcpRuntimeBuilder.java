@@ -1,6 +1,5 @@
 package org.tavall.webdesign.mcp;
 
-import org.tavall.ai.core.catalog.AIFunctionCatalog;
 import org.tavall.ai.mcp.server.AIFunctionMcpStandaloneHttpServer;
 import org.tavall.webdesign.agent.WebDesignAgentRoleConfigurationBuilder;
 import org.tavall.webdesign.application.WebDesignApplicationServices;
@@ -60,17 +59,7 @@ public final class WebDesignMcpRuntimeBuilder {
                 previewRuntime,
                 optional("WEB_DESIGN_AGENT_PUBLIC_BASE_URL")
         );
-        WebDesignMcpFunctions functions = new WebDesignMcpFunctions(
-                services.generationHandler(),
-                services.refinementHandler(),
-                services.conceptGenerationHandler(),
-                services.exportBuilder(),
-                services.roleConfigurationBuilder()
-        );
-
-        AIFunctionCatalog catalog = new AIFunctionCatalog(services.objectMapper());
-        catalog.registerInstances(functions);
-        WebDesignMcpAppResource appResource = WebDesignMcpAppResource.fromClasspath(resourceDomains());
+        WebDesignMcpSurface surface = new WebDesignMcpSurfaceBuilder(services, environment).build();
         Map<String, String> connectorProperties = Map.of(
                 "connectionTimeout", Integer.toString(headersTimeoutMillis),
                 "connectionUploadTimeout", Integer.toString(requestReceiveTimeoutMillis),
@@ -113,11 +102,11 @@ public final class WebDesignMcpRuntimeBuilder {
 
         try {
             AIFunctionMcpStandaloneHttpServer server = AIFunctionMcpStandaloneHttpServer.start(
-                    catalog,
+                    surface.catalog(),
                     serverConfiguration,
-                    List.of(appResource.specification()),
-                    List.of(),
-                    new WebDesignMcpToolPresentationResolver().resolve(),
+                    surface.resources(),
+                    surface.prompts(),
+                    surface.presentations(),
                     supplementalServlets,
                     filters
             );
@@ -128,18 +117,6 @@ public final class WebDesignMcpRuntimeBuilder {
             }
             throw exception;
         }
-    }
-
-    private List<String> resourceDomains() {
-        String configured = optional("WEB_DESIGN_AGENT_APP_RESOURCE_DOMAINS");
-        if (configured == null) {
-            return List.of();
-        }
-        return java.util.Arrays.stream(configured.split(","))
-                .map(String::trim)
-                .filter(value -> !value.isEmpty())
-                .distinct()
-                .toList();
     }
 
     private int port() {
