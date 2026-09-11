@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public final class WebDesignGenerationEvidenceResolver {
     private final WebDesignAgentRoleConfigurationBuilder.WebDesignAgentCapabilities capabilities;
@@ -133,7 +134,9 @@ public final class WebDesignGenerationEvidenceResolver {
                 .filter(path -> !"/".equals(path))
                 .toList();
         for (DesignCandidate candidate : candidates) {
-            var actual = candidate.pages().stream().map(DesignCandidate.Page::path).collect(java.util.stream.Collectors.toSet());
+            Set<String> actual = candidate.pages().stream()
+                    .map(DesignCandidate.Page::path)
+                    .collect(java.util.stream.Collectors.toSet());
             List<String> missing = required.stream().filter(path -> !actual.contains(path)).toList();
             if (!missing.isEmpty()) {
                 throw new DesignResultValidationException(
