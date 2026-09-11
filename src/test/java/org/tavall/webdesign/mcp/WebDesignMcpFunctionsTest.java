@@ -1,5 +1,6 @@
 package org.tavall.webdesign.mcp;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.tavall.ai.core.catalog.AIFunctionCatalog;
@@ -25,6 +26,7 @@ import org.tavall.webdesign.design.validation.WebDesignInvocationResultValidator
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.StreamSupport;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -50,6 +52,16 @@ class WebDesignMcpFunctionsTest {
                 .containsExactly("prompt");
         assertThat(catalog.getFunctionDefinitions().get("refine-design").getRequiredParameters())
                 .containsExactlyInAnyOrder("candidate", "visualState");
+
+        JsonNode sourceModeSchema = catalog.getFunctionDefinitions()
+                .get("design")
+                .getCanonicalParametersSchema()
+                .path("properties")
+                .path("sourceMode");
+        assertThat(sourceModeSchema.path("type").asText()).isEqualTo("string");
+        assertThat(StreamSupport.stream(sourceModeSchema.path("enum").spliterator(), false)
+                .map(JsonNode::asText)
+                .toList()).containsExactly("code-first", "existing-site", "reference-image");
     }
 
     @Test
@@ -93,7 +105,7 @@ class WebDesignMcpFunctionsTest {
         assertThat(objectMapper.valueToTree(exported.data()).path("standaloneHtml").asText()).contains("<!doctype html>");
     }
 
-    private static WebDesignMcpFunctions functions(ObjectMapper objectMapper) {
+    static WebDesignMcpFunctions functions(ObjectMapper objectMapper) {
         WebDesignAgentRoleConfigurationBuilder roleConfiguration = new WebDesignAgentRoleConfigurationBuilder(Map.of());
         WebDesignStrandsConfigurationResolver strandsConfiguration = new WebDesignStrandsConfigurationResolver(Map.of(
                 WebDesignStrandsConfigurationResolver.NODE_EXECUTABLE_ENV, "/bin/false",
@@ -133,7 +145,7 @@ class WebDesignMcpFunctionsTest {
         );
     }
 
-    private static DesignCandidate candidate() {
+    static DesignCandidate candidate() {
         DesignGenome genome = new DesignGenome(
                 "editorial",
                 "top",
