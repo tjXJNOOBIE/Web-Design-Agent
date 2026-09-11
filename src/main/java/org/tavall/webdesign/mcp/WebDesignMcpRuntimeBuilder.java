@@ -32,6 +32,7 @@ public final class WebDesignMcpRuntimeBuilder {
     private static final int DEFAULT_MAX_REQUEST_BODY_BYTES = 1_048_576;
     private static final int DEFAULT_REQUEST_RECEIVE_TIMEOUT_MILLIS = 30_000;
     private static final int DEFAULT_HEADERS_TIMEOUT_MILLIS = 15_000;
+    private static final String TEXT_DATA_POINTER = "/data";
 
     private final Map<String, String> environment;
 
@@ -190,6 +191,9 @@ public final class WebDesignMcpRuntimeBuilder {
         presentations.put("create-design-concepts", presentation("Explore visual concepts", uiMeta));
         presentations.put("design-from-concept", presentation("Build A/B/C from concept", uiMeta));
         presentations.put("export-design", presentation("Export selected design", uiMeta));
+        presentations.put("extract-design-system", dataProjection());
+        presentations.put("build-design-preference-profile", dataProjection());
+        presentations.put("web-design-capabilities", dataProjection());
         return Map.copyOf(presentations);
     }
 
@@ -197,7 +201,11 @@ public final class WebDesignMcpRuntimeBuilder {
             String title,
             Map<String, Object> meta
     ) {
-        return new AIFunctionMcpToolPublisher.ToolPresentation(title, meta);
+        return new AIFunctionMcpToolPublisher.ToolPresentation(title, meta, TEXT_DATA_POINTER);
+    }
+
+    private static AIFunctionMcpToolPublisher.ToolPresentation dataProjection() {
+        return new AIFunctionMcpToolPublisher.ToolPresentation("", Map.of(), TEXT_DATA_POINTER);
     }
 
     private List<String> resourceDomains() {
