@@ -103,6 +103,10 @@ jobs:
         working-directory: Web-Design-Agent
         run: npm ci --ignore-scripts
 
+      - name: Typecheck browser-only MCP App
+        working-directory: Web-Design-Agent
+        run: npm run typecheck:app
+
       - name: Configure physical bridge integration
         shell: bash
         run: |
