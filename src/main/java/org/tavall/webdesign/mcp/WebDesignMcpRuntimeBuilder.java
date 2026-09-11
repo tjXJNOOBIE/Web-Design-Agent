@@ -2,14 +2,12 @@ package org.tavall.webdesign.mcp;
 
 import org.tavall.ai.core.catalog.AIFunctionCatalog;
 import org.tavall.ai.mcp.server.AIFunctionMcpStandaloneHttpServer;
-import org.tavall.ai.mcp.server.AIFunctionMcpToolPublisher;
 import org.tavall.webdesign.agent.WebDesignAgentRoleConfigurationBuilder;
 import org.tavall.webdesign.application.WebDesignApplicationServices;
 import org.tavall.webdesign.application.WebDesignApplicationServicesBuilder;
 import org.tavall.webdesign.design.preview.WebDesignAgentPreviewRuntime;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -21,7 +19,6 @@ public final class WebDesignMcpRuntimeBuilder {
     private static final int DEFAULT_MAX_REQUEST_BODY_BYTES = 1_048_576;
     private static final int DEFAULT_REQUEST_RECEIVE_TIMEOUT_MILLIS = 30_000;
     private static final int DEFAULT_HEADERS_TIMEOUT_MILLIS = 15_000;
-    private static final String TEXT_DATA_POINTER = "/data";
 
     private final Map<String, String> environment;
 
@@ -120,7 +117,7 @@ public final class WebDesignMcpRuntimeBuilder {
                     serverConfiguration,
                     List.of(appResource.specification()),
                     List.of(),
-                    toolPresentations(),
+                    new WebDesignMcpToolPresentationResolver().resolve(),
                     supplementalServlets,
                     filters
             );
@@ -131,31 +128,6 @@ public final class WebDesignMcpRuntimeBuilder {
             }
             throw exception;
         }
-    }
-
-    private Map<String, AIFunctionMcpToolPublisher.ToolPresentation> toolPresentations() {
-        Map<String, Object> uiMeta = WebDesignMcpAppResource.toolMeta();
-        Map<String, AIFunctionMcpToolPublisher.ToolPresentation> presentations = new LinkedHashMap<>();
-        presentations.put("design", presentation("Design website A/B/C", uiMeta));
-        presentations.put("refine-design", presentation("Refine selected design", uiMeta));
-        presentations.put("create-design-concepts", presentation("Explore visual concepts", uiMeta));
-        presentations.put("design-from-concept", presentation("Build A/B/C from concept", uiMeta));
-        presentations.put("export-design", presentation("Export selected design", uiMeta));
-        presentations.put("extract-design-system", dataProjection());
-        presentations.put("build-design-preference-profile", dataProjection());
-        presentations.put("web-design-capabilities", dataProjection());
-        return Map.copyOf(presentations);
-    }
-
-    private static AIFunctionMcpToolPublisher.ToolPresentation presentation(
-            String title,
-            Map<String, Object> meta
-    ) {
-        return new AIFunctionMcpToolPublisher.ToolPresentation(title, meta, TEXT_DATA_POINTER);
-    }
-
-    private static AIFunctionMcpToolPublisher.ToolPresentation dataProjection() {
-        return new AIFunctionMcpToolPublisher.ToolPresentation("", Map.of(), TEXT_DATA_POINTER);
     }
 
     private List<String> resourceDomains() {
