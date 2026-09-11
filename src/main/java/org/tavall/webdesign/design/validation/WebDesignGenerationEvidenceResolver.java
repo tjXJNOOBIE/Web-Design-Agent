@@ -9,10 +9,12 @@ import org.tavall.webdesign.design.data.DesignGenerationResult;
 import org.tavall.webdesign.design.data.DesignIntent;
 import org.tavall.webdesign.design.data.DesignSourceMode;
 import org.tavall.webdesign.design.data.DesignValidation;
+import org.tavall.webdesign.design.preview.WebDesignAgentPreviewRuntime;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 
 public final class WebDesignGenerationEvidenceResolver {
     private final WebDesignAgentRoleConfigurationBuilder.WebDesignAgentCapabilities capabilities;
@@ -28,6 +30,15 @@ public final class WebDesignGenerationEvidenceResolver {
             DesignGenerationRequest request,
             WebDesignAgentToolEvidenceCollector evidence
     ) {
+        return resolve(result, request, evidence, null);
+    }
+
+    public DesignGenerationResult resolve(
+            DesignGenerationResult result,
+            DesignGenerationRequest request,
+            WebDesignAgentToolEvidenceCollector evidence,
+            FinalPreviewInspection finalPreviewInspection
+    ) {
         List<DesignCandidateId> candidateIds = result.candidates().stream().map(DesignCandidate::id).toList();
         String expectedBrowserTarget = expectedBrowserTarget(request);
         boolean sourceBoundBrowserValidation = expectedBrowserTarget != null;
@@ -36,12 +47,23 @@ public final class WebDesignGenerationEvidenceResolver {
                 : candidateIds;
         boolean observedBrowserInspection = capabilities.browser()
                 && evidence.missingBrowserInspection(candidateIds, null).isEmpty();
+        List<DesignCandidateId> missingFinalPreviewInspection = finalPreviewInspection == null
+                ? candidateIds
+                : candidateIds.stream()
+                .filter(candidateId -> !finalPreviewInspection.evidence().hasBrowserInspection(
+                        candidateId,
+                        finalPreviewInspection.targets().get(candidateId).url()
+                ))
+                .toList();
+        boolean finalPreviewValidated = finalPreviewInspection != null
+                && missingFinalPreviewInspection.isEmpty();
         boolean browserValidated = capabilities.browser()
-                && sourceBoundBrowserValidation
-                && missingSourceInspection.isEmpty();
+                && (sourceBoundBrowserValidation
+                ? missingSourceInspection.isEmpty()
+                : finalPreviewValidated);
 
         List<DesignCandidate> candidates = result.candidates().stream()
-                .map(candidate -> withRuntimeBrowserEvidence(candidate, evidence))
+                .map(candidate -> withRuntimeBrowserEvidence(candidate, evidence, finalPreviewInspection))
                 .toList();
         List<String> notes = new ArrayList<>();
         result.validation().notes().forEach(note -> notes.add("Agent note (unverified): " + note));
@@ -52,10 +74,18 @@ public final class WebDesignGenerationEvidenceResolver {
             notes.add("Runtime evidence: successful browser inspection of the required source target was observed for candidates A, B, and C.");
         } else if (sourceBoundBrowserValidation) {
             notes.add("Runtime evidence: required browser inspection was not observed for candidates " + joinIds(missingSourceInspection) + ".");
+        } else if (finalPreviewValidated) {
+            notes.add("Runtime evidence: the exact final A/B/C artifacts were render-bound to content-addressed public previews and successfully inspected with browser tooling.");
+        } else if (finalPreviewInspection != null) {
+            String missing = missingFinalPreviewInspection.size() == 1
+                    ? "candidate " + missingFinalPreviewInspection.getFirst()
+                    : "candidates " + joinIds(missingFinalPreviewInspection);
+            notes.add("Runtime evidence: final render-bound content-addressed preview inspection was not observed for "
+                    + missing + "; browserValidated remains false.");
         } else if (observedBrowserInspection) {
             notes.add("Runtime evidence: browser activity was observed for candidates A, B, and C, but the final returned candidate implementations were not render-bound to content-addressed previews; browserValidated remains false.");
         } else {
-            notes.add("Runtime evidence: final candidate preview publication is not active in the Java migration slice, so code-first output is not render-bound and browserValidated remains false.");
+            notes.add("Runtime evidence: final candidate preview publication is unavailable, so code-first output is not render-bound and browserValidated remains false.");
         }
 
         if (capabilities.components()) {
@@ -122,12 +152,17 @@ public final class WebDesignGenerationEvidenceResolver {
 
     private DesignCandidate withRuntimeBrowserEvidence(
             DesignCandidate candidate,
-            WebDesignAgentToolEvidenceCollector evidence
+            WebDesignAgentToolEvidenceCollector evidence,
+            FinalPreviewInspection finalPreviewInspection
     ) {
-        List<String> runtimeEvidence = capabilities.browser()
-                ? evidence.browserEvidence(candidate.id())
-                : List.of();
-        List<String> unique = List.copyOf(new LinkedHashSet<>(runtimeEvidence)).stream().sorted().toList();
+        List<String> runtimeEvidence = new ArrayList<>();
+        if (capabilities.browser()) {
+            runtimeEvidence.addAll(evidence.browserEvidence(candidate.id()));
+            if (finalPreviewInspection != null) {
+                runtimeEvidence.addAll(finalPreviewInspection.evidence().browserEvidence(candidate.id()));
+            }
+        }
+        List<String> unique = new LinkedHashSet<>(runtimeEvidence).stream().sorted().toList();
         return new DesignCandidate(
                 candidate.id(),
                 candidate.title(),
@@ -157,5 +192,14 @@ public final class WebDesignGenerationEvidenceResolver {
 
     private static String joinIds(List<DesignCandidateId> ids) {
         return ids.stream().map(Enum::name).collect(java.util.stream.Collectors.joining(", "));
+    }
+
+    public record FinalPreviewInspection(
+            WebDesignAgentToolEvidenceCollector evidence,
+            Map<DesignCandidateId, WebDesignAgentPreviewRuntime.Target> targets
+    ) {
+        public FinalPreviewInspection {
+            targets = Map.copyOf(targets);
+        }
     }
 }
