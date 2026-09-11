@@ -1,5 +1,6 @@
 package org.tavall.webdesign.mcp;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.modelcontextprotocol.client.McpClient;
 import io.modelcontextprotocol.client.McpSyncClient;
@@ -13,10 +14,13 @@ import org.tavall.ai.mcp.server.AIFunctionMcpToolPublisher;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.StreamSupport;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class WebDesignMcpHttpIntegrationTest {
+    private static final String DATA_POINTER = "/data";
+
     @Test
     void officialJavaClientCanUsePublicWdaOverStreamableHttp() {
         ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
@@ -29,11 +33,14 @@ class WebDesignMcpHttpIntegrationTest {
         );
         Map<String, Object> uiMeta = WebDesignMcpAppResource.toolMeta();
         Map<String, AIFunctionMcpToolPublisher.ToolPresentation> presentations = Map.of(
-                "design", new AIFunctionMcpToolPublisher.ToolPresentation("Design website A/B/C", uiMeta),
-                "refine-design", new AIFunctionMcpToolPublisher.ToolPresentation("Refine selected design", uiMeta),
-                "create-design-concepts", new AIFunctionMcpToolPublisher.ToolPresentation("Explore visual concepts", uiMeta),
-                "design-from-concept", new AIFunctionMcpToolPublisher.ToolPresentation("Build A/B/C from concept", uiMeta),
-                "export-design", new AIFunctionMcpToolPublisher.ToolPresentation("Export selected design", uiMeta)
+                "design", presentation("Design website A/B/C", uiMeta),
+                "refine-design", presentation("Refine selected design", uiMeta),
+                "create-design-concepts", presentation("Explore visual concepts", uiMeta),
+                "design-from-concept", presentation("Build A/B/C from concept", uiMeta),
+                "export-design", presentation("Export selected design", uiMeta),
+                "extract-design-system", dataProjection(),
+                "build-design-preference-profile", dataProjection(),
+                "web-design-capabilities", dataProjection()
         );
         AIFunctionMcpStandaloneHttpServer.Configuration configuration =
                 new AIFunctionMcpStandaloneHttpServer.Configuration(
@@ -81,6 +88,12 @@ class WebDesignMcpHttpIntegrationTest {
                         .findFirst()
                         .orElseThrow();
                 assertThat(designTool.meta()).isEqualTo(uiMeta);
+                JsonNode designSchema = objectMapper.valueToTree(designTool.inputSchema());
+                assertThat(StreamSupport.stream(
+                        designSchema.path("properties").path("sourceMode").path("enum").spliterator(),
+                        false
+                ).map(JsonNode::asText).toList())
+                        .containsExactly("code-first", "existing-site", "reference-image");
 
                 McpSchema.ReadResourceResult app = client.readResource(
                         new McpSchema.ReadResourceRequest(WebDesignMcpAppResource.RESOURCE_URI)
@@ -99,7 +112,24 @@ class WebDesignMcpHttpIntegrationTest {
                 Map<?, ?> structured = (Map<?, ?>) capabilities.structuredContent();
                 assertThat(structured.get("kind")).isEqualTo("capabilities");
                 assertThat(structured.get("data")).isInstanceOf(Map.class);
+                assertThat(capabilities.content().getFirst()).isInstanceOf(McpSchema.TextContent.class);
+                McpSchema.TextContent text = (McpSchema.TextContent) capabilities.content().getFirst();
+                assertThat(objectMapper.readTree(text.text()))
+                        .isEqualTo(objectMapper.valueToTree(structured.get("data")));
+            } catch (java.io.IOException exception) {
+                throw new IllegalStateException("Failed to parse MCP smoke-test text content", exception);
             }
         }
+    }
+
+    private static AIFunctionMcpToolPublisher.ToolPresentation presentation(
+            String title,
+            Map<String, Object> meta
+    ) {
+        return new AIFunctionMcpToolPublisher.ToolPresentation(title, meta, DATA_POINTER);
+    }
+
+    private static AIFunctionMcpToolPublisher.ToolPresentation dataProjection() {
+        return new AIFunctionMcpToolPublisher.ToolPresentation("", Map.of(), DATA_POINTER);
     }
 }
