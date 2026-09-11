@@ -1,5 +1,6 @@
 package org.tavall.webdesign.mcp;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.tavall.ai.core.annotation.AIFunction;
 import org.tavall.ai.core.annotation.AIParam;
 import org.tavall.webdesign.agent.WebDesignAgentRoleConfigurationBuilder;
@@ -44,7 +45,7 @@ public final class WebDesignMcpFunctions {
     public Payload design(
             @AIParam(name = "prompt", description = "Website design brief") String prompt,
             @AIParam(name = "sourceMode", description = "code-first, reference-image, or existing-site", required = false)
-            String sourceMode,
+            PublicDesignSourceMode sourceMode,
             @AIParam(name = "referenceImageUrl", description = "Public reference image URL", required = false)
             String referenceImageUrl,
             @AIParam(name = "targetUrl", description = "Public existing-site target URL", required = false)
@@ -54,12 +55,9 @@ public final class WebDesignMcpFunctions {
             @AIParam(name = "preferenceProfile", description = "Portable design preference profile", required = false)
             DesignPreferenceProfile preferenceProfile
     ) {
-        DesignSourceMode resolvedSourceMode = sourceMode == null || sourceMode.isBlank()
-                ? null
-                : DesignSourceMode.fromWireValue(sourceMode);
         DesignGenerationRequest request = new DesignGenerationRequest(
                 prompt,
-                resolvedSourceMode,
+                sourceMode == null ? null : sourceMode.internalMode(),
                 referenceImageUrl,
                 targetUrl,
                 null,
@@ -166,6 +164,25 @@ public final class WebDesignMcpFunctions {
     @AIFunction(name = "web-design-capabilities", description = "Report configured external capabilities.")
     public Payload webDesignCapabilities() {
         return new Payload("capabilities", roleConfigurationBuilder.capabilities());
+    }
+
+    public enum PublicDesignSourceMode {
+        @JsonProperty("code-first")
+        CODE_FIRST(DesignSourceMode.CODE_FIRST),
+        @JsonProperty("reference-image")
+        REFERENCE_IMAGE(DesignSourceMode.REFERENCE_IMAGE),
+        @JsonProperty("existing-site")
+        EXISTING_SITE(DesignSourceMode.EXISTING_SITE);
+
+        private final DesignSourceMode internalMode;
+
+        PublicDesignSourceMode(DesignSourceMode internalMode) {
+            this.internalMode = internalMode;
+        }
+
+        public DesignSourceMode internalMode() {
+            return internalMode;
+        }
     }
 
     public record Payload(String kind, Object data) {
