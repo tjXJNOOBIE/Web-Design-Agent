@@ -67,7 +67,9 @@ jobs:
         with:
           node-version: "24"
           cache: npm
-          cache-dependency-path: strands-bridge/package-lock.json
+          cache-dependency-path: |
+            Web-Design-Agent/package-lock.json
+            strands-bridge/package-lock.json
 
       - uses: gradle/actions/setup-gradle@v5
         with:
@@ -93,13 +95,17 @@ jobs:
           npm ci --ignore-scripts
           npm run check:real
 
+      - name: Install Web Design Agent browser build dependencies
+        working-directory: Web-Design-Agent
+        run: npm ci --ignore-scripts
+
       - name: Configure physical bridge integration
         shell: bash
         run: |
           echo "STRANDS_BRIDGE_INTEGRATION_NODE=$(command -v node)" >> "$GITHUB_ENV"
           echo "STRANDS_BRIDGE_INTEGRATION_ENTRYPOINT=${GITHUB_WORKSPACE}/strands-bridge/dist/mcp/main.js" >> "$GITHUB_ENV"
 
-      - name: Validate Java WDA specialist graph
+      - name: Validate Java WDA specialist graph and packaged MCP App
         working-directory: Web-Design-Agent
         shell: bash
         run: |
