@@ -1,0 +1,35 @@
+name: Browser lock refresh
+
+on:
+  push:
+    branches:
+      - working/java-first-strands-mcp
+    paths:
+      - package.json
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: working/java-first-strands-mcp
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+      - name: Regenerate browser-only lockfile
+        run: npm install --package-lock-only --ignore-scripts
+      - name: Commit lockfile if changed
+        shell: bash
+        run: |
+          if git diff --quiet -- package-lock.json; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "Refresh browser-only npm lockfile"
+          git push origin HEAD:working/java-first-strands-mcp
