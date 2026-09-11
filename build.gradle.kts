@@ -82,6 +82,13 @@ tasks.processResources {
 
 val javaRuntimeClasspath = files(tasks.named("jar")) + configurations.runtimeClasspath.get()
 
+val stdioStartScripts by tasks.registering(CreateStartScripts::class) {
+    applicationName = "web-design-agent-mcp-stdio"
+    mainClass.set("org.tavall.webdesign.mcp.WebDesignMcpStdioApplication")
+    outputDir = layout.buildDirectory.dir("scripts/stdio").get().asFile
+    classpath = javaRuntimeClasspath
+}
+
 val cliStartScripts by tasks.registering(CreateStartScripts::class) {
     applicationName = "web-design-agent"
     mainClass.set("org.tavall.webdesign.cli.WebDesignCliApplication")
@@ -99,6 +106,9 @@ val evaluationStartScripts by tasks.registering(CreateStartScripts::class) {
 distributions {
     named("main") {
         contents {
+            from(stdioStartScripts) {
+                into("bin")
+            }
             from(cliStartScripts) {
                 into("bin")
             }
@@ -107,6 +117,14 @@ distributions {
             }
         }
     }
+}
+
+tasks.register<JavaExec>("runStdioMcp") {
+    group = "application"
+    description = "Run the Java-owned Web Design Agent MCP server over stdio."
+    mainClass.set("org.tavall.webdesign.mcp.WebDesignMcpStdioApplication")
+    classpath = sourceSets.main.get().runtimeClasspath
+    standardInput = System.`in`
 }
 
 tasks.register<JavaExec>("runCli") {
