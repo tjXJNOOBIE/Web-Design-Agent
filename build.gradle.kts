@@ -1,3 +1,5 @@
+import org.gradle.jvm.application.tasks.CreateStartScripts
+
 plugins {
     java
     application
@@ -13,6 +15,7 @@ java {
 
 application {
     mainClass.set("org.tavall.webdesign.mcp.WebDesignMcpApplication")
+    applicationName = "web-design-agent-mcp"
 }
 
 repositories {
@@ -75,6 +78,50 @@ tasks.processResources {
     from(layout.projectDirectory.file("dist/mcp-app.html")) {
         into("web-design-agent")
     }
+}
+
+val javaRuntimeClasspath = files(tasks.named("jar")) + configurations.runtimeClasspath.get()
+
+val cliStartScripts by tasks.registering(CreateStartScripts::class) {
+    applicationName = "web-design-agent"
+    mainClass.set("org.tavall.webdesign.cli.WebDesignCliApplication")
+    outputDir = layout.buildDirectory.dir("scripts/cli").get().asFile
+    classpath = javaRuntimeClasspath
+}
+
+val evaluationStartScripts by tasks.registering(CreateStartScripts::class) {
+    applicationName = "web-design-agent-eval"
+    mainClass.set("org.tavall.webdesign.evaluation.WebDesignEvaluationApplication")
+    outputDir = layout.buildDirectory.dir("scripts/evaluation").get().asFile
+    classpath = javaRuntimeClasspath
+}
+
+distributions {
+    named("main") {
+        contents {
+            from(cliStartScripts) {
+                into("bin")
+            }
+            from(evaluationStartScripts) {
+                into("bin")
+            }
+        }
+    }
+}
+
+tasks.register<JavaExec>("runCli") {
+    group = "application"
+    description = "Run the Java-owned Web Design Agent CLI."
+    mainClass.set("org.tavall.webdesign.cli.WebDesignCliApplication")
+    classpath = sourceSets.main.get().runtimeClasspath
+    standardInput = System.`in`
+}
+
+tasks.register<JavaExec>("runEvaluation") {
+    group = "application"
+    description = "Run the Java-owned Web Design Agent one-shot evaluation corpus."
+    mainClass.set("org.tavall.webdesign.evaluation.WebDesignEvaluationApplication")
+    classpath = sourceSets.main.get().runtimeClasspath
 }
 
 tasks.withType<JavaCompile>().configureEach {
