@@ -6,31 +6,25 @@ import org.tavall.webdesign.agent.WebDesignGenerationPromptBuilder;
 import org.tavall.webdesign.agent.WebDesignStrandsConfigurationResolver;
 import org.tavall.webdesign.agent.WebDesignStrandsGraphRuntime;
 import org.tavall.webdesign.agent.evidence.WebDesignAgentToolEvidenceCollector;
+import org.tavall.webdesign.design.data.DesignCandidate;
+import org.tavall.webdesign.design.data.DesignCandidateId;
 import org.tavall.webdesign.design.data.DesignGenerationRequest;
 import org.tavall.webdesign.design.data.DesignGenerationResult;
+import org.tavall.webdesign.design.data.DesignSourceMode;
+import org.tavall.webdesign.design.preview.WebDesignAgentPreviewRuntime;
 import org.tavall.webdesign.design.validation.DesignDistanceEvaluator;
 import org.tavall.webdesign.design.validation.DesignGenerationResultParser;
 import org.tavall.webdesign.design.validation.DesignResultValidationException;
 import org.tavall.webdesign.design.validation.WebDesignGenerationEvidenceResolver;
 import org.tavall.webdesign.design.validation.WebDesignGenerationRequestResolver;
+import org.tavall.webdesign.design.validation.WebDesignInvocationResultValidator;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 public final class WebDesignGenerationHandler {
-    private static final Set<String> FAILED_INVOCATION_STOP_REASONS = Set.of(
-            "cancelled",
-            "limitTurns",
-            "limitTotalTokens",
-            "limitOutputTokens",
-            "maxTokens",
-            "modelContextWindowExceeded",
-            "contentFiltered",
-            "guardrailIntervened",
-            "refusal"
-    );
-
     private final WebDesignStrandsConfigurationResolver strandsConfigurationResolver;
     private final WebDesignAgentRoleConfigurationBuilder roleConfigurationBuilder;
     private final WebDesignGenerationRequestResolver requestResolver;
@@ -38,6 +32,9 @@ public final class WebDesignGenerationHandler {
     private final DesignGenerationResultParser parser;
     private final DesignDistanceEvaluator distanceEvaluator;
     private final WebDesignGenerationEvidenceResolver evidenceResolver;
+    private final WebDesignInvocationResultValidator invocationValidator;
+    private final WebDesignAgentPreviewRuntime previewRuntime;
+    private final String previewBaseUrl;
 
     public WebDesignGenerationHandler(
             WebDesignStrandsConfigurationResolver strandsConfigurationResolver,
@@ -46,7 +43,34 @@ public final class WebDesignGenerationHandler {
             WebDesignGenerationPromptBuilder promptBuilder,
             DesignGenerationResultParser parser,
             DesignDistanceEvaluator distanceEvaluator,
-            WebDesignGenerationEvidenceResolver evidenceResolver
+            WebDesignGenerationEvidenceResolver evidenceResolver,
+            WebDesignInvocationResultValidator invocationValidator
+    ) {
+        this(
+                strandsConfigurationResolver,
+                roleConfigurationBuilder,
+                requestResolver,
+                promptBuilder,
+                parser,
+                distanceEvaluator,
+                evidenceResolver,
+                invocationValidator,
+                null,
+                null
+        );
+    }
+
+    public WebDesignGenerationHandler(
+            WebDesignStrandsConfigurationResolver strandsConfigurationResolver,
+            WebDesignAgentRoleConfigurationBuilder roleConfigurationBuilder,
+            WebDesignGenerationRequestResolver requestResolver,
+            WebDesignGenerationPromptBuilder promptBuilder,
+            DesignGenerationResultParser parser,
+            DesignDistanceEvaluator distanceEvaluator,
+            WebDesignGenerationEvidenceResolver evidenceResolver,
+            WebDesignInvocationResultValidator invocationValidator,
+            WebDesignAgentPreviewRuntime previewRuntime,
+            String previewBaseUrl
     ) {
         this.strandsConfigurationResolver = strandsConfigurationResolver;
         this.roleConfigurationBuilder = roleConfigurationBuilder;
@@ -55,6 +79,9 @@ public final class WebDesignGenerationHandler {
         this.parser = parser;
         this.distanceEvaluator = distanceEvaluator;
         this.evidenceResolver = evidenceResolver;
+        this.invocationValidator = invocationValidator;
+        this.previewRuntime = previewRuntime;
+        this.previewBaseUrl = previewBaseUrl == null || previewBaseUrl.isBlank() ? null : previewBaseUrl.trim();
     }
 
     public DesignGenerationResult generate(DesignGenerationRequest request) {
@@ -65,12 +92,10 @@ public final class WebDesignGenerationHandler {
             );
         }
 
-        WebDesignStrandsGraphRuntime graph = new WebDesignStrandsGraphRuntime(
+        try (WebDesignStrandsGraphRuntime graph = new WebDesignStrandsGraphRuntime(
                 strandsConfigurationResolver.resolve(),
                 roleConfigurationBuilder
-        );
-        RuntimeException operationFailure = null;
-        try {
+        )) {
             graph.start();
             ParsedInvocation invocation = invokeGeneration(graph, normalized, "");
             DesignGenerationResult result = invocation.result();
@@ -98,20 +123,14 @@ public final class WebDesignGenerationHandler {
             }
 
             evidenceResolver.validateRequestedPages(normalized, result.candidates());
-            return evidenceResolver.resolve(result, normalized, invocation.evidence());
-        } catch (RuntimeException exception) {
-            operationFailure = exception;
-            throw exception;
-        } finally {
-            try {
-                graph.close();
-            } catch (RuntimeException closeFailure) {
-                if (operationFailure != null) {
-                    operationFailure.addSuppressed(closeFailure);
-                } else {
-                    throw closeFailure;
-                }
-            }
+            WebDesignGenerationEvidenceResolver.FinalPreviewInspection finalPreviewInspection =
+                    inspectFinalCodeFirstCandidates(graph, result.candidates(), normalized);
+            return evidenceResolver.resolve(
+                    result,
+                    normalized,
+                    invocation.evidence(),
+                    finalPreviewInspection
+            );
         }
     }
 
@@ -121,16 +140,48 @@ public final class WebDesignGenerationHandler {
             String suffix
     ) {
         StrandsObservedInvocationResult invocation = graph.invokeDirectorObserved(promptBuilder.build(request, suffix));
-        String stopReason = invocation.stopReason();
-        if (stopReason != null && FAILED_INVOCATION_STOP_REASONS.contains(stopReason)) {
-            throw new DesignResultValidationException(
-                    "Web Design Agent invocation stopped before a complete result was produced: " + stopReason + "."
-            );
-        }
+        invocationValidator.assertComplete(invocation);
 
         WebDesignAgentToolEvidenceCollector evidence = new WebDesignAgentToolEvidenceCollector();
         evidence.recordAll(invocation.toolEvents());
         return new ParsedInvocation(parser.parseGeneration(invocation.text()), evidence);
+    }
+
+    private WebDesignGenerationEvidenceResolver.FinalPreviewInspection inspectFinalCodeFirstCandidates(
+            WebDesignStrandsGraphRuntime graph,
+            List<DesignCandidate> candidates,
+            DesignGenerationRequest request
+    ) {
+        if (request.sourceMode() != DesignSourceMode.CODE_FIRST
+                || request.targetUrl() != null
+                || !roleConfigurationBuilder.capabilities().browser()
+                || previewRuntime == null
+                || previewBaseUrl == null) {
+            return null;
+        }
+
+        try (WebDesignAgentPreviewRuntime.Publication publication = previewRuntime.publish(candidates, previewBaseUrl)) {
+            List<String> lines = new ArrayList<>();
+            lines.add("OPERATION: inspect-final-code-first-previews");
+            lines.add("The runtime has already parsed and frozen the exact final candidate artifacts.");
+            lines.add("Invoke candidate_a, candidate_b, and candidate_c. Tell each matching specialist to perform inspect-final-code-first-preview only.");
+            lines.add("Each specialist must browser_navigate to its exact assigned URL and then run browser_snapshot or browser_take_screenshot on that page.");
+            lines.add("Do not redesign, repair, rewrite, regenerate, or substitute any candidate or URL during this operation.");
+            lines.add("The runtime will ignore prose claims and accept only observed browser lifecycle evidence bound to the exact URLs below.");
+            for (DesignCandidateId candidateId : DesignCandidateId.values()) {
+                lines.add("Candidate " + candidateId + " final preview: " + publication.targets().get(candidateId).url());
+            }
+            lines.add("Return JSON only: {\"inspected\":[\"A\",\"B\",\"C\"]}.");
+
+            StrandsObservedInvocationResult invocation = graph.invokeDirectorObserved(String.join("\n", lines));
+            invocationValidator.assertComplete(invocation);
+            WebDesignAgentToolEvidenceCollector evidence = new WebDesignAgentToolEvidenceCollector();
+            evidence.recordAll(invocation.toolEvents());
+            return new WebDesignGenerationEvidenceResolver.FinalPreviewInspection(
+                    evidence,
+                    publication.targets()
+            );
+        }
     }
 
     private record ParsedInvocation(
