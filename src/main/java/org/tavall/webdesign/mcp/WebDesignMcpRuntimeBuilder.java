@@ -1,23 +1,12 @@
 package org.tavall.webdesign.mcp;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.tavall.ai.core.catalog.AIFunctionCatalog;
 import org.tavall.ai.mcp.server.AIFunctionMcpStandaloneHttpServer;
 import org.tavall.ai.mcp.server.AIFunctionMcpToolPublisher;
 import org.tavall.webdesign.agent.WebDesignAgentRoleConfigurationBuilder;
-import org.tavall.webdesign.agent.WebDesignGenerationPromptBuilder;
-import org.tavall.webdesign.agent.WebDesignStrandsConfigurationResolver;
-import org.tavall.webdesign.design.export.DesignExportBuilder;
-import org.tavall.webdesign.design.handler.WebDesignConceptGenerationHandler;
-import org.tavall.webdesign.design.handler.WebDesignGenerationHandler;
-import org.tavall.webdesign.design.handler.WebDesignRefinementHandler;
+import org.tavall.webdesign.application.WebDesignApplicationServices;
+import org.tavall.webdesign.application.WebDesignApplicationServicesBuilder;
 import org.tavall.webdesign.design.preview.WebDesignAgentPreviewRuntime;
-import org.tavall.webdesign.design.validation.DesignDistanceEvaluator;
-import org.tavall.webdesign.design.validation.DesignGenerationResultParser;
-import org.tavall.webdesign.design.validation.WebDesignAgentBrowserTargetValidator;
-import org.tavall.webdesign.design.validation.WebDesignGenerationEvidenceResolver;
-import org.tavall.webdesign.design.validation.WebDesignGenerationRequestResolver;
-import org.tavall.webdesign.design.validation.WebDesignInvocationResultValidator;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -41,11 +30,8 @@ public final class WebDesignMcpRuntimeBuilder {
     }
 
     public WebDesignMcpRuntime build() {
-        ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
-        WebDesignAgentRoleConfigurationBuilder roleConfigurationBuilder =
-                new WebDesignAgentRoleConfigurationBuilder(environment);
-        WebDesignAgentRoleConfigurationBuilder.WebDesignAgentCapabilities capabilities =
-                roleConfigurationBuilder.capabilities();
+        WebDesignApplicationServicesBuilder servicesBuilder = new WebDesignApplicationServicesBuilder(environment);
+        WebDesignAgentRoleConfigurationBuilder.WebDesignAgentCapabilities capabilities = servicesBuilder.capabilities();
         new WebDesignPublicDeploymentValidator().validate(capabilities, environment);
 
         int maximumConcurrentRequests = positiveInteger(
@@ -73,55 +59,19 @@ public final class WebDesignMcpRuntimeBuilder {
         WebDesignAgentPreviewRuntime previewRuntime = capabilities.browser()
                 ? new WebDesignAgentPreviewRuntime(maximumConcurrentRequests)
                 : null;
-        String publicBaseUrl = optional("WEB_DESIGN_AGENT_PUBLIC_BASE_URL");
-        WebDesignStrandsConfigurationResolver strandsConfigurationResolver =
-                new WebDesignStrandsConfigurationResolver(environment);
-        WebDesignGenerationRequestResolver requestResolver = new WebDesignGenerationRequestResolver(
-                new WebDesignAgentBrowserTargetValidator()
-        );
-        WebDesignGenerationPromptBuilder promptBuilder = new WebDesignGenerationPromptBuilder(
-                objectMapper,
-                capabilities
-        );
-        DesignGenerationResultParser parser = new DesignGenerationResultParser(objectMapper);
-        WebDesignInvocationResultValidator invocationValidator = new WebDesignInvocationResultValidator();
-        WebDesignGenerationEvidenceResolver evidenceResolver = new WebDesignGenerationEvidenceResolver(capabilities);
-        DesignExportBuilder exportBuilder = new DesignExportBuilder();
-
-        WebDesignGenerationHandler generationHandler = new WebDesignGenerationHandler(
-                strandsConfigurationResolver,
-                roleConfigurationBuilder,
-                requestResolver,
-                promptBuilder,
-                parser,
-                new DesignDistanceEvaluator(),
-                evidenceResolver,
-                invocationValidator,
+        WebDesignApplicationServices services = servicesBuilder.build(
                 previewRuntime,
-                publicBaseUrl
-        );
-        WebDesignRefinementHandler refinementHandler = new WebDesignRefinementHandler(
-                strandsConfigurationResolver,
-                roleConfigurationBuilder,
-                parser,
-                invocationValidator,
-                objectMapper
-        );
-        WebDesignConceptGenerationHandler conceptGenerationHandler = new WebDesignConceptGenerationHandler(
-                strandsConfigurationResolver,
-                roleConfigurationBuilder,
-                parser,
-                invocationValidator
+                optional("WEB_DESIGN_AGENT_PUBLIC_BASE_URL")
         );
         WebDesignMcpFunctions functions = new WebDesignMcpFunctions(
-                generationHandler,
-                refinementHandler,
-                conceptGenerationHandler,
-                exportBuilder,
-                roleConfigurationBuilder
+                services.generationHandler(),
+                services.refinementHandler(),
+                services.conceptGenerationHandler(),
+                services.exportBuilder(),
+                services.roleConfigurationBuilder()
         );
 
-        AIFunctionCatalog catalog = new AIFunctionCatalog(objectMapper);
+        AIFunctionCatalog catalog = new AIFunctionCatalog(services.objectMapper());
         catalog.registerInstances(functions);
         WebDesignMcpAppResource appResource = WebDesignMcpAppResource.fromClasspath(resourceDomains());
         Map<String, String> connectorProperties = Map.of(
