@@ -1,5 +1,6 @@
 plugins {
     java
+    application
     id("org.tavall.architecture-tests") version "0.1.0-SNAPSHOT"
 }
 
@@ -8,6 +9,10 @@ version = "0.3.0-SNAPSHOT"
 
 java {
     toolchain.languageVersion = JavaLanguageVersion.of(25)
+}
+
+application {
+    mainClass.set("org.tavall.webdesign.mcp.WebDesignMcpApplication")
 }
 
 repositories {
@@ -40,6 +45,7 @@ dependencies {
     implementation("org.tavall:mcp-server:${functionCatalogVersion.get()}")
     implementation("org.tavall:tavall-di:${tavallDiVersion.get()}")
     implementation("com.fasterxml.jackson.core:jackson-databind:2.20.1")
+    implementation("org.apache.tomcat.embed:tomcat-embed-core:11.0.20")
 
     testImplementation(platform("org.junit:junit-bom:5.11.4"))
     testImplementation("org.junit.jupiter:junit-jupiter")
@@ -49,6 +55,25 @@ dependencies {
 
 architectureTests {
     modules.set(listOf("core", "patterns", "di", "runtime"))
+}
+
+val buildMcpApp by tasks.registering(Exec::class) {
+    workingDir(layout.projectDirectory)
+    inputs.files(
+        "package.json",
+        "package-lock.json",
+        "vite.config.ts",
+        fileTree("src/mcp-app")
+    )
+    outputs.file(layout.projectDirectory.file("dist/mcp-app.html"))
+    commandLine("npm", "run", "build:app")
+}
+
+tasks.processResources {
+    dependsOn(buildMcpApp)
+    from(layout.projectDirectory.file("dist/mcp-app.html")) {
+        into("web-design-agent")
+    }
 }
 
 tasks.withType<JavaCompile>().configureEach {
