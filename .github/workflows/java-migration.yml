@@ -7,6 +7,10 @@ on:
       - main
       - "working/**"
 
+concurrency:
+  group: java-migration-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
   packages: read
@@ -105,12 +109,15 @@ jobs:
           echo "STRANDS_BRIDGE_INTEGRATION_NODE=$(command -v node)" >> "$GITHUB_ENV"
           echo "STRANDS_BRIDGE_INTEGRATION_ENTRYPOINT=${GITHUB_WORKSPACE}/strands-bridge/dist/mcp/main.js" >> "$GITHUB_ENV"
 
-      - name: Validate Java WDA specialist graph and packaged MCP App
+      - name: Validate Java WDA specialist graph, MCP transport, browser app, and distribution
         working-directory: Web-Design-Agent
         shell: bash
         run: |
           set -o pipefail
-          gradle --no-daemon -Dstrands.bridge.integration.required=true clean test build 2>&1 | tee java-migration.log
+          gradle --no-daemon -Dstrands.bridge.integration.required=true clean test build installDist 2>&1 | tee java-migration.log
+          test -x build/install/web-design-agent-mcp/bin/web-design-agent-mcp
+          test -x build/install/web-design-agent-mcp/bin/web-design-agent
+          test -x build/install/web-design-agent-mcp/bin/web-design-agent-eval
 
       - name: Preserve Java migration diagnostics
         if: always()
