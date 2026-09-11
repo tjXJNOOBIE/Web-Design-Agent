@@ -35,7 +35,12 @@ public final class WebDesignPreviewServlet extends HttpServlet {
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.setContentType("text/html");
         response.setHeader("Content-Security-Policy", preview.contentSecurityPolicy());
-        response.setHeader("Cache-Control", "no-store, max-age=0");
+        response.setHeader("Cache-Control", "no-store");
+        response.setHeader(
+                "Permissions-Policy",
+                "accelerometer=(), camera=(), geolocation=(), gyroscope=(), microphone=(), payment=(), usb=()"
+        );
+        response.setHeader("Referrer-Policy", "no-referrer");
         response.setHeader("X-Content-Type-Options", "nosniff");
         response.setContentLength(body.length);
         response.getOutputStream().write(body);
