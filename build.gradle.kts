@@ -3,7 +3,7 @@ import org.gradle.jvm.application.tasks.CreateStartScripts
 plugins {
     java
     application
-    id("org.tavall.architecture-tests") version "0.1.0-SNAPSHOT"
+    id("org.tavall.architecture-tests") version "1.0.0"
 }
 
 group = "org.tavall.webdesign"
@@ -19,7 +19,6 @@ application {
 }
 
 repositories {
-    mavenLocal()
     mavenCentral()
     val githubToken = providers.environmentVariable("GITHUB_TOKEN").orNull
     if (!githubToken.isNullOrBlank()) {
@@ -35,7 +34,7 @@ repositories {
     }
 }
 
-val functionCatalogVersion = providers.gradleProperty("functionCatalogVersion").orElse("1.0.1")
+val functionCatalogVersion = providers.gradleProperty("functionCatalogVersion").orElse("1.0.3")
 val tavallDiVersion = providers.gradleProperty("tavallDiVersion").orElse("1.0.0")
 
 configurations.configureEach {

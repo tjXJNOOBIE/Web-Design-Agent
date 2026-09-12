@@ -44,6 +44,25 @@ The Gradle distribution installs four commands:
 
 The HTTP and stdio transports share the same Java Function Catalog, tool metadata, MCP App resource, schemas, and result contract.
 
+## npm distribution
+
+The public product package is a thin launcher around the Java distribution. It
+includes the browser MCP App compiled into the Java artifact, verifies the
+bundled runtime manifest, and resolves the pinned standalone Strands bridge. It
+does not create a Node product backend.
+
+```bash
+npm install @tjxjnoobie/web-design-agent
+npx @tjxjnoobie/web-design-agent doctor
+npx web-design-agent-mcp
+npx web-design-agent-mcp-stdio
+npx web-design-agent "Make a landing page for a community garden"
+```
+
+The package is prepared for public npm publication. The current registry has no
+published `@tjxjnoobie` scope, so the current clean-consumer evidence uses the
+versioned tarball produced by `npm pack`.
+
 ## A/B/C contract
 
 Material design work must produce three structurally distinct candidates, not three paint jobs on the same layout. Candidates vary composition, navigation, hero strategy, typography class, density, geometry, surface/depth model, motion, content rhythm, and imagery strategy.

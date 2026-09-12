@@ -83,7 +83,7 @@ public final class WebDesignMcpRuntimeBuilder {
         supplementalServlets.add(new AIFunctionMcpStandaloneHttpServer.ServletRegistration(
                 "webDesignStatus",
                 new WebDesignStatusServlet(),
-                List.of("/")
+                List.of("/", "/healthz", "/readyz")
         ));
         if (previewRuntime != null) {
             supplementalServlets.add(new AIFunctionMcpStandaloneHttpServer.ServletRegistration(

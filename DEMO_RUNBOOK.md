@@ -3,10 +3,14 @@
 ## Clean consumer
 
 ```bash
+npm run check:app
+gradle --no-daemon clean check installDist
+npm run package:runtime
 npm pack
 mkdir /tmp/wda-consumer && cd /tmp/wda-consumer
 npm init -y
-npm install /path/to/tjxjnoobie-web-design-agent-0.2.0.tgz
+npm install /path/to/tjxjnoobie-web-design-agent-0.3.0.tgz
+npx web-design-agent doctor
 WEB_DESIGN_AGENT_PORT=3001 npx web-design-agent-mcp
 ```
 

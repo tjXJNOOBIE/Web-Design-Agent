@@ -1,18 +1,35 @@
 {
   "name": "@tjxjnoobie/web-design-agent",
   "version": "0.3.0",
-  "private": true,
-  "description": "Browser build tooling for the Java-owned Web Design Agent MCP App.",
+  "description": "Java-owned Web Design Agent with an npm installation and launcher layer.",
   "type": "module",
   "engines": {
     "node": ">=22"
   },
+  "bin": {
+    "web-design-agent": "./bin/web-design-agent.mjs",
+    "web-design-agent-mcp": "./bin/web-design-agent.mjs",
+    "web-design-agent-mcp-stdio": "./bin/web-design-agent.mjs",
+    "web-design-agent-eval": "./bin/web-design-agent.mjs"
+  },
+  "files": [
+    "bin",
+    "runtime",
+    "runtime-manifest.json",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build:app": "vite build",
     "typecheck:app": "tsc -p tsconfig.json --noEmit",
-    "check:app": "npm run typecheck:app && npm run build:app"
+    "check:app": "npm run typecheck:app && npm run build:app",
+    "package:runtime": "node scripts/package-runtime.mjs",
+    "test": "npm run package:runtime && node bin/web-design-agent.mjs doctor",
+    "check": "npm run check:app && gradle --no-daemon check",
+    "prepack": "npm run package:runtime"
   },
   "dependencies": {
+    "@tjxjnoobie/strands-bridge": "github:tjXJNOOBIE/strands-bridge#34b2d0129d362edc10b9b540114e81a5cabf082f",
     "@modelcontextprotocol/ext-apps": "^1.7.5"
   },
   "devDependencies": {

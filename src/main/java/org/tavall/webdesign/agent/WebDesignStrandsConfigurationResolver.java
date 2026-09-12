@@ -56,7 +56,7 @@ public final class WebDesignStrandsConfigurationResolver {
                 nodeExecutable,
                 bridgeEntrypoint,
                 strandsEnvironment,
-                Duration.ZERO,
+                Duration.ofMinutes(5),
                 optionalEnvironment("WEB_DESIGN_AGENT_MODEL_ID")
         );
     }

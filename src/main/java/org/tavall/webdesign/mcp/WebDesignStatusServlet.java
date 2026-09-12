@@ -11,7 +11,9 @@ import java.nio.charset.StandardCharsets;
 public final class WebDesignStatusServlet extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        if (!"/".equals(request.getRequestURI())) {
+        if (!"/".equals(request.getRequestURI())
+                && !"/healthz".equals(request.getRequestURI())
+                && !"/readyz".equals(request.getRequestURI())) {
             response.sendError(HttpServletResponse.SC_NOT_FOUND);
             return;
         }
@@ -20,7 +22,7 @@ public final class WebDesignStatusServlet extends HttpServlet {
         response.setContentType("application/json");
         response.setHeader("Cache-Control", "no-store");
         response.getWriter().write(
-                "{\"name\":\"Web Design Agent\",\"version\":\"0.2.0\",\"mcp\":\"/mcp\",\"authentication\":\"none\"}"
+                "{\"status\":\"ok\",\"name\":\"Web Design Agent\",\"version\":\"0.3.0\",\"mcp\":\"/mcp\",\"authentication\":\"none\"}"
         );
     }
 }
