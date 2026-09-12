@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "agent": "Web Design Agent",
+  "generatedAt": "2026-09-12T18:22:00Z",
+  "entries": [
+    {
+      "scenario": "Native Candidate A/B/C, Critic, Director design job with real browser/provider result",
+      "date": "2026-09-12",
+      "environment": "Tavall Cloud DEVELOPMENT; browser renderer is available, but no authorized model/image/browser provider acceptance credential was available",
+      "serviceProvider": "Standalone Strands model boundary, browser renderer, and configured image/browser providers",
+      "sourceCommit": "b8418d78ffdd188e967657396149869833bfa4d5",
+      "artifactFilename": null,
+      "artifactLocation": null,
+      "artifactSha256": null,
+      "action": null,
+      "authoritativeVerification": null,
+      "classification": "UNEXECUTED",
+      "status": "BLOCKED",
+      "blockingReason": "The five-agent native graph was physically constructed, but the real model invocation timed out and no external image/browser provider credentials were available. No fixture or synthetic browser footage is being claimed."
+    }
+  ]
+}
