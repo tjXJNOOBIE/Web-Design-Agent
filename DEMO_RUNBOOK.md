@@ -40,3 +40,5 @@ a real vague-prompt A/B/C/refine/export capture remain unverified.
 When a machine exposes a wrapper and a separately installed logged-in Codex
 binary, set `STRANDS_BRIDGE_CODEX_COMMAND` to the absolute logged-in binary
 path. This keeps subscription authentication and cleanup behavior deterministic.
+No synthetic browser result is presented as acceptance. The required video
+manifest records the unexecuted real-design-job gate and its current blocker.

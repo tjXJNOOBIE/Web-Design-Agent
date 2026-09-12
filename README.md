@@ -222,3 +222,7 @@ Its TypeScript is intentionally browser-only under `src/mcp-app`. There is no se
 - `tjXJNOOBIE/strands-bridge` — standalone native Strands reasoning runtime.
 
 See `AGENTS.md` for the engineering rules that keep those boundaries intact.
+The required real design-job video is not claimed yet. The native
+Candidate-A/B/C → Critic → Director graph and browser renderer are tested, but
+the real model/provider invocation timed out in this environment; the exact
+blocker is recorded in docs/evidence/VIDEO_EVIDENCE_MANIFEST.json.
