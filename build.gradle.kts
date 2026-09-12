@@ -3,7 +3,7 @@ import org.gradle.jvm.application.tasks.CreateStartScripts
 plugins {
     java
     application
-    id("org.tavall.architecture-tests") version "1.0.0"
+    id("org.tavall.architecture-tests") version "0.1.0-SNAPSHOT"
 }
 
 group = "org.tavall.webdesign"
@@ -19,6 +19,7 @@ application {
 }
 
 repositories {
+    mavenLocal()
     mavenCentral()
     val githubToken = providers.environmentVariable("GITHUB_TOKEN").orNull
     if (!githubToken.isNullOrBlank()) {
