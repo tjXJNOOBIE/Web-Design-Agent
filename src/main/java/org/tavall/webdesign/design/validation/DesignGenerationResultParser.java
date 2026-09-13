@@ -72,12 +72,13 @@ public final class DesignGenerationResultParser {
             pages.add(page);
         }
 
+        DesignGenome genome = parseGenome(required(object, "genome"));
         return new DesignCandidate(
                 candidateId(required(object, "id")),
                 requiredText(required(object, "title"), "candidate.title"),
                 requiredText(required(object, "thesis"), "candidate.thesis"),
-                parseGenome(required(object, "genome")),
-                parseDesignSystem(required(object, "designSystem")),
+                genome,
+                parseDesignSystem(required(object, "designSystem"), genome.typography()),
                 parseDocument(required(object, "document")),
                 pages,
                 parseVisualState(required(object, "visualState")),
@@ -149,7 +150,7 @@ public final class DesignGenerationResultParser {
         );
     }
 
-    private DesignSystem parseDesignSystem(JsonNode value) {
+    private DesignSystem parseDesignSystem(JsonNode value, String fallbackTypography) {
         ObjectNode object = object(value, "designSystem");
         List<DesignSystem.Token> tokens = new ArrayList<>();
         for (JsonNode valueNode : array(required(object, "tokens"), "designSystem.tokens")) {
@@ -161,7 +162,19 @@ public final class DesignGenerationResultParser {
         }
 
         List<DesignSystem.Typography> typography = new ArrayList<>();
-        for (JsonNode valueNode : array(required(object, "typography"), "designSystem.typography")) {
+        JsonNode typographyValue = object.get("typography");
+        if (typographyValue == null || typographyValue.isNull()) {
+            // Keep the product contract deterministic when a model omits this
+            // redundant projection: genome.typography is already authoritative
+            // evidence of the selected type direction.
+            ArrayNode fallback = objectMapper.createArrayNode();
+            fallback.addObject()
+                    .put("role", "body")
+                    .put("family", fallbackTypography)
+                    .put("weight", "400");
+            typographyValue = fallback;
+        }
+        for (JsonNode valueNode : array(typographyValue, "designSystem.typography")) {
             ObjectNode item = object(valueNode, "typography");
             typography.add(new DesignSystem.Typography(
                     requiredText(required(item, "role"), "typography.role"),

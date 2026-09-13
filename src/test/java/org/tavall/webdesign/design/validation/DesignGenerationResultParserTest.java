@@ -53,6 +53,17 @@ class DesignGenerationResultParserTest {
                 .hasMessageContaining("visualState.motion must be between 0 and 1");
     }
 
+    @Test
+    void derivesMissingDesignSystemTypographyFromTheValidatedGenome() {
+        String withoutTypography = validGeneration().replace(
+                "\"typography\":[{\"role\":\"body\",\"family\":\"Inter\",\"weight\":\"400\"}],",
+                ""
+        );
+
+        assertThat(parser.parseGeneration(withoutTypography).candidates().getFirst().designSystem().typography())
+                .containsExactly(new org.tavall.webdesign.design.data.DesignSystem.Typography("body", "sans", "400"));
+    }
+
     private static String validGeneration() {
         return """
                 {
