@@ -33,7 +33,11 @@ public final class WebDesignStrandsConfigurationResolver {
             "OPENAI_API_KEY",
             "GOOGLE_API_KEY",
             "GEMINI_API_KEY",
-            "STRANDS_BRIDGE_CODEX_COMMAND"
+            "STRANDS_BRIDGE_USE_CODEX_SUBSCRIPTION",
+            "STRANDS_BRIDGE_CODEX_COMMAND",
+            "STRANDS_BRIDGE_CODEX_MODEL",
+            "STRANDS_BRIDGE_CODEX_TIMEOUT_MS",
+            "STRANDS_BRIDGE_CODEX_REASONING_EFFORT"
     );
 
     private final Map<String, String> environment;
@@ -56,7 +60,10 @@ public final class WebDesignStrandsConfigurationResolver {
                 nodeExecutable,
                 bridgeEntrypoint,
                 strandsEnvironment,
-                Duration.ofMinutes(5),
+                Duration.ofMillis(nonnegativeLong(
+                        "WEB_DESIGN_AGENT_STRANDS_TIMEOUT_MS",
+                        Duration.ZERO.toMillis()
+                )),
                 optionalEnvironment("WEB_DESIGN_AGENT_MODEL_ID")
         );
     }
@@ -72,5 +79,21 @@ public final class WebDesignStrandsConfigurationResolver {
     private String optionalEnvironment(String name) {
         String value = environment.get(name);
         return value == null ? "" : value.trim();
+    }
+
+    private long nonnegativeLong(String name, long fallback) {
+        String value = optionalEnvironment(name);
+        if (value.isBlank()) {
+            return fallback;
+        }
+        try {
+            long parsed = Long.parseLong(value);
+            if (parsed < 0) {
+                throw new NumberFormatException();
+            }
+            return parsed;
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException(name + " must be a non-negative integer in milliseconds; use 0 for unlimited", exception);
+        }
     }
 }

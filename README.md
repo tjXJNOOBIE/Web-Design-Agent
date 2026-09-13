@@ -130,6 +130,11 @@ Optional model selection:
 WEB_DESIGN_AGENT_MODEL_ID=global.anthropic.claude-sonnet-4-6
 ```
 
+The Java-to-bridge request deadline is unlimited by default because the
+caller-owned cancellation signal and Strands turn/token limits remain
+authoritative. Set `WEB_DESIGN_AGENT_STRANDS_TIMEOUT_MS` to a positive
+millisecond value for an operational deadline, or `0` for unlimited.
+
 The bridge child receives only an explicit allow-list of environment variables. Product-only secrets are not inherited implicitly.
 
 ### Optional capabilities
