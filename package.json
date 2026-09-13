@@ -29,7 +29,7 @@
     "prepack": "npm run package:runtime"
   },
   "dependencies": {
-    "@tjxjnoobie/strands-bridge": "https://github.com/tjXJNOOBIE/strands-bridge/archive/34b2d0129d362edc10b9b540114e81a5cabf082f.tar.gz",
+    "@tjxjnoobie/strands-bridge": "https://github.com/tjXJNOOBIE/strands-bridge/archive/45874c0d0a3aa36918f01b381189c33d1ed7c559.tar.gz",
     "@modelcontextprotocol/ext-apps": "^1.7.5"
   },
   "devDependencies": {
