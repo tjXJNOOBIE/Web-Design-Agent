@@ -4,7 +4,7 @@
 
 Web Design Agent is a Strands-powered design product that turns ambiguous product intent into real A/B/C website implementations, grounds them in browser/provider evidence, lets a human compare and visually tune the candidates, and refines the selected direction into exportable HTML/CSS/JS plus reusable design-system evidence.
 
-[Hackathon submission](HACKATHON_SUBMISSION.md) · [Demo runbook](DEMO_RUNBOOK.md) · [Architecture](docs/ARCHITECTURE.svg) · [Source](https://github.com/tjXJNOOBIE/Web-Design-Agent)
+[Hackathon submission](HACKATHON_SUBMISSION.md) · [Demo runbook](DEMO_RUNBOOK.md) · [Architecture](docs/ARCHITECTURE.svg) · [Safety boundary](docs/SAFETY_BOUNDARY.svg) · [Source](https://github.com/tjXJNOOBIE/Web-Design-Agent)
 
 ![Web Design Agent architecture](docs/ARCHITECTURE.svg)
 
@@ -122,6 +122,8 @@ The MCP App is the human selection and refinement surface. It supports:
 
 The public MCP endpoint is account-free, not authority-free.
 
+![Web Design Agent safety boundary](docs/SAFETY_BOUNDARY.svg)
+
 Explicit browserable source URLs are validated before Strands sees them:
 
 - HTTP(S) only;
@@ -228,6 +230,7 @@ The repository keeps deterministic product validation, packed-consumer startup, 
 - [`HACKATHON_SUBMISSION.md`](HACKATHON_SUBMISSION.md) contains the hackathon framing and pre-existing-component disclosure.
 - [`DEMO_RUNBOOK.md`](DEMO_RUNBOOK.md) contains the exact demo and acceptance path.
 - [`docs/ARCHITECTURE.svg`](docs/ARCHITECTURE.svg) shows the Director, specialists, deterministic runtime, and provider boundaries.
+- [`docs/SAFETY_BOUNDARY.svg`](docs/SAFETY_BOUNDARY.svg) shows the public NoAuth and browser/network authority boundary.
 - Runtime evidence is collected from real tool events instead of accepting model-authored validation claims.
 
 The project is released under the [MIT License](LICENSE).
