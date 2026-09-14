@@ -1,1 +1,0 @@
-export const ONE_SHOT_DESIGN_PROMPT_CORPUS=['make me a portfolio','website for my pizza place','make a minecraft server website','I need a site for my consulting business','landing page for an AI startup','make a cool clothing store','dashboard for managing servers'] as const

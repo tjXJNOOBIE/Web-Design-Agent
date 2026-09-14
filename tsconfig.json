@@ -1,1 +1,17 @@
-{"compilerOptions":{"target":"ES2022","module":"NodeNext","moduleResolution":"NodeNext","strict":true,"noUncheckedIndexedAccess":true,"exactOptionalPropertyTypes":true,"declaration":true,"declarationMap":true,"sourceMap":true,"esModuleInterop":true,"forceConsistentCasingInFileNames":true,"skipLibCheck":true,"types":["node"],"lib":["ES2022","DOM","DOM.Iterable"]},"include":["src/**/*.ts","test/**/*.ts","vite.config.ts"]}
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"]
+  },
+  "include": ["src/mcp-app/**/*.ts", "vite.config.ts"]
+}

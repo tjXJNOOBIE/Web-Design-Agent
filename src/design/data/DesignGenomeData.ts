@@ -1,1 +1,0 @@
-export interface DesignGenomeData {readonly composition:string;readonly navigation:string;readonly heroStrategy:string;readonly typography:string;readonly density:number;readonly geometry:string;readonly surfaceModel:string;readonly depth:number;readonly motion:string;readonly contentRhythm:string;readonly imageryStrategy:string}
